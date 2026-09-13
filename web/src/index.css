@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0e13;
+  --color-panel: #11161e;
+  --color-panel-2: #171e29;
+  --color-edge: #243042;
+  --color-text: #e3e8ef;
+  --color-muted: #8894a5;
+  --color-accent: #e0952b;
+  --color-bull: #26a86f;
+  --color-bear: #e5534b;
+  --color-warn: #d6a13a;
+  --color-info: #5b93ff;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-body: "Inter", system-ui, sans-serif;
+}
+
+:root[data-theme="light"] {
+  --color-bg: #eef1f5;
+  --color-panel: #ffffff;
+  --color-panel-2: #f4f6f9;
+  --color-edge: #d3d9e1;
+  --color-text: #141a22;
+  --color-muted: #5d6877;
+  --color-accent: #b86f0e;
+  --color-bull: #1c7f53;
+  --color-bear: #c23b33;
+  --color-warn: #9a6b12;
+  --color-info: #2c62d4;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-edge) transparent;
+}
+
+table th {
+  font-weight: 500;
+}
+
+details > summary {
+  cursor: pointer;
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}

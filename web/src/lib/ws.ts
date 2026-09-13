@@ -1,0 +1,94 @@
+import { getToken } from "./api";
+
+export interface WsMessage {
+  type: string;
+  ts?: string;
+  data: unknown;
+}
+
+type Handler = (message: WsMessage) => void;
+export type SocketState = "connecting" | "open" | "closed";
+
+function tokenProtocol(token: string): string {
+  const bytes = new TextEncoder().encode(token);
+  let binary = "";
+  bytes.forEach((b) => {
+    binary += String.fromCharCode(b);
+  });
+  return `cc-token.${btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
+}
+
+class DashboardSocket {
+  private socket: WebSocket | null = null;
+  private handlers = new Set<Handler>();
+  private stateHandlers = new Set<(state: SocketState) => void>();
+  private retries = 0;
+  private retryTimer: number | undefined;
+  private pingTimer: number | undefined;
+  state: SocketState = "closed";
+
+  connect(): void {
+    if (this.socket && this.socket.readyState <= WebSocket.OPEN) return;
+    const protocol = location.protocol === "https:" ? "wss" : "ws";
+    const token = getToken();
+    this.setState("connecting");
+    // The access token is sent as a subprotocol, never in the URL.
+    const socket = token ? new WebSocket(`${protocol}://${location.host}/ws`, [tokenProtocol(token)]) : new WebSocket(`${protocol}://${location.host}/ws`);
+    this.socket = socket;
+    socket.onopen = () => {
+      this.retries = 0;
+      this.setState("open");
+      this.pingTimer = window.setInterval(() => {
+        if (socket.readyState === WebSocket.OPEN) socket.send("ping");
+      }, 25_000);
+    };
+    socket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(String(event.data)) as WsMessage;
+        this.handlers.forEach((handler) => handler(message));
+      } catch {
+        /* ignore malformed frames */
+      }
+    };
+    socket.onclose = () => {
+      window.clearInterval(this.pingTimer);
+      if (this.socket !== socket) return;
+      this.socket = null;
+      this.setState("closed");
+      const delay = Math.min(30_000, 1000 * 2 ** this.retries++);
+      this.retryTimer = window.setTimeout(() => this.connect(), delay);
+    };
+    socket.onerror = () => socket.close();
+  }
+
+  reconnect(): void {
+    window.clearTimeout(this.retryTimer);
+    const current = this.socket;
+    this.socket = null;
+    current?.close();
+    this.connect();
+  }
+
+  subscribe(handler: Handler): () => void {
+    this.handlers.add(handler);
+    this.connect();
+    return () => {
+      this.handlers.delete(handler);
+    };
+  }
+
+  onState(handler: (state: SocketState) => void): () => void {
+    this.stateHandlers.add(handler);
+    handler(this.state);
+    return () => {
+      this.stateHandlers.delete(handler);
+    };
+  }
+
+  private setState(state: SocketState): void {
+    this.state = state;
+    this.stateHandlers.forEach((handler) => handler(state));
+  }
+}
+
+export const socket = new DashboardSocket();
