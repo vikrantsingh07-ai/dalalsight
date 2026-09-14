@@ -20,6 +20,7 @@ It is one repository with one Python environment.
 | TradingView | `tradingview/` | The signal engine as a Pine Script v6 indicator for your TradingView app |
 | Docs | `docs/` | [How it works](docs/HOW_IT_WORKS.md) · [Deployment (Vercel + backend)](docs/DEPLOYMENT.md) · design notes |
 | Container | `Dockerfile` | API + built dashboard in one image for an always-on backend host |
+| Server setup | `deploy/` | Ubuntu VPS setup script, systemd unit and Caddyfile ([Deployment](docs/DEPLOYMENT.md)) |
 
 ```text
 dalalsight/
@@ -140,6 +141,7 @@ are validated and stored in SQLite.
 ## Tests and checks
 
 ```bash
+.venv/Scripts/python.exe -m cc --check                              # preflight: config + live NSE/Yahoo/AI access
 .venv/Scripts/python.exe -m pytest                                  # DalalSight backend (offline)
 .venv/Scripts/python.exe -m ruff check backend
 .venv/Scripts/python.exe -m mypy

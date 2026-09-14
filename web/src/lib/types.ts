@@ -712,8 +712,36 @@ export interface BacktestSummary {
   skipped_gap_entries: number;
   entries_not_filled?: number;
   equity_curve_r?: number[];
+  calibration?: Calibration;
   assumptions: string[];
   data_source?: string;
+}
+
+export interface CalibrationBucket {
+  bucket: string;
+  samples: number;
+  up_first: number;
+  down_first: number;
+  neither: number;
+  ambiguous: number;
+  stated_bullish_pct: number | null;
+  observed_up_pct: number | null;
+  avg_forward_atr: number | null;
+  directional_samples: number;
+  hit_pct: number | null;
+  avg_forward_atr_in_direction: number | null;
+}
+
+export interface Calibration {
+  samples: number;
+  horizon_bars: number;
+  touch_atr: number;
+  mean_abs_gap_pts: number | null;
+  by_bullish_pct: CalibrationBucket[];
+  by_label: CalibrationBucket[];
+  by_confidence: CalibrationBucket[];
+  method: string;
+  note: string;
 }
 
 export interface BacktestRow {

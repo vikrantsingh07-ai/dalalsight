@@ -1,4 +1,5 @@
-"""Walk-forward backtest of the signal engine and outcome tracking for recorded signals.
+"""Walk-forward backtest of the signal engine, calibration of its stated probabilities, and outcome tracking for
+recorded signals.
 
 No look-ahead: at each bar close the engine only sees bars up to that close (indicators are
 causal; levels, events, regime and the signal are rebuilt on a trailing window ending at that
@@ -7,6 +8,10 @@ signal bar's close and is valid for a few bars (filled at the better of the bar 
 plus slippage); unfilled orders expire. When one bar touches both the stop and the target, the stop
 is assumed to fill first. R multiples use the planned risk (limit to stop). Results are historical
 simulations, not forecasts.
+
+Calibration asks whether the engine's "bullish scenario %" means what it says: at every evaluated bar it records
+the stated percentage, then checks which came first in the following bars, a move of +1 ATR or −1 ATR. A calibrated
+engine shows about 65% "up first" among the bars where it stated 65%.
 """
 
 from __future__ import annotations
@@ -25,6 +30,12 @@ from .indicators import compute_indicators
 from .levels import compute_levels
 from .regime import detect_regime
 from .signal_engine import LABEL_BEAR, LABEL_BULL, build_signal
+
+CALIBRATION_TOUCH_ATR = 1.0
+MIN_RESOLVED = 30  # buckets with fewer resolved bars are too noisy to judge
+BULLISH_BUCKETS = [(0.0, 35.0, "0–35"), (35.0, 42.0, "35–42"), (42.0, 50.0, "42–50"), (50.0, 58.0, "50–58"),
+                   (58.0, 65.0, "58–65"), (65.0, 100.01, "65–100")]
+CONFIDENCE_BUCKETS = [(0.0, 25.0, "0–25"), (25.0, 40.0, "25–40"), (40.0, 55.0, "40–55"), (55.0, 100.01, "55–100")]
 
 
 class BacktestParams(BaseModel):
@@ -52,6 +63,7 @@ def run_backtest(frame: pd.DataFrame, params: BacktestParams, settings: RuntimeS
     slip = params.slippage_bps / 10000
     trades: list[dict] = []
     labels: Counter[str] = Counter()
+    samples: list[dict] = []
     skipped_gaps = 0
     unfilled = 0
     position: dict | None = None
@@ -78,15 +90,18 @@ def run_backtest(frame: pd.DataFrame, params: BacktestParams, settings: RuntimeS
                 price, reason = exit_info
                 trades.append(_close_trade(position, price * (1 - position["direction"] * slip), reason, ind.index[i], i, params))
                 position = None
-        if position is None and pending is None and i < n - 1:
+        if i < n - 1:
+            # the signal is evaluated at every bar (for calibration); orders are only placed when flat
             window = ind.iloc[max(0, i - params.window + 1): i + 1]
             levels = compute_levels(window, intraday, cfg.swing_lookback, cfg.breakout_lookback)
             events = detect_events(window, levels, cfg, settings.commentary.level_test_atr)
             regime = detect_regime(window)
             signal = build_signal(params.symbol, params.timeframe, window, events, levels, regime, None, cfg, settings.risk, ["backtest"])
             labels[signal.label] += 1
+            samples.append({"i": i, "bullish_pct": signal.bullish_pct, "confidence": signal.model_confidence,
+                            "label": signal.label, "direction": signal.direction})
             # never place a new intraday order on the session's last bar (it could only fill tomorrow)
-            if signal.label in allowed and signal.plan is not None and not session_end:
+            if position is None and pending is None and signal.label in allowed and signal.plan is not None and not session_end:
                 plan = signal.plan
                 pending = {
                     "direction": plan.direction, "limit": (plan.entry_low + plan.entry_high) / 2, "stop": plan.stop,
@@ -100,7 +115,9 @@ def run_backtest(frame: pd.DataFrame, params: BacktestParams, settings: RuntimeS
         unfilled += 1
     if position is not None:
         trades.append(_close_trade(position, float(ind["close"].iloc[-1]), "end of data", ind.index[-1], n - 1, params))
-    return {"summary": summarize(trades, labels, skipped_gaps, ind, params, unfilled), "trades": trades}
+    summary = summarize(trades, labels, skipped_gaps, ind, params, unfilled)
+    summary["calibration"] = calibrate(ind, samples, params.max_hold_bars, square_off)
+    return {"summary": summary, "trades": trades}
 
 
 def _try_fill(pending: dict, bar: pd.Series, i: int, ts: pd.Timestamp, slip: float) -> tuple[dict | None, bool]:
@@ -212,7 +229,81 @@ def summarize(trades: list[dict], labels: Counter, skipped_gaps: int, ind: pd.Da
             "stop assumed first when a bar touches both stop and target",
             f"costs {params.cost_pct_per_side}% per side; slippage {params.slippage_bps} bps",
             "options component excluded (no historical option chains)",
+            "signal label counts cover every evaluated bar, including bars when a trade was already open",
         ],
+    }
+
+
+# ---------------------------------------------------------------------------- calibration
+def calibrate(ind: pd.DataFrame, samples: list[dict], horizon: int, same_session: bool) -> dict:
+    """Compare the engine's stated bullish % and confidence with what price did next (see the module docstring)."""
+    high, low, close = (ind[c].to_numpy(dtype=float) for c in ("high", "low", "close"))
+    atr = ind["atr"].to_numpy(dtype=float)
+    dates = ind.index.date
+    n = len(ind)
+    rows: list[dict] = []
+    for sample in samples:
+        i = sample["i"]
+        unit = atr[i]
+        if not np.isfinite(unit) or unit <= 0:
+            continue
+        end = i
+        while end + 1 < n and end + 1 <= i + horizon and not (same_session and dates[end + 1] != dates[i]):
+            end += 1
+        if end == i:
+            continue  # no later bar to judge (last bar of a session or of the data)
+        up, down = close[i] + CALIBRATION_TOUCH_ATR * unit, close[i] - CALIBRATION_TOUCH_ATR * unit
+        outcome = "neither"
+        for j in range(i + 1, end + 1):
+            hit_up, hit_down = high[j] >= up, low[j] <= down
+            if hit_up and hit_down:
+                outcome = "ambiguous"
+                break
+            if hit_up or hit_down:
+                outcome = "up" if hit_up else "down"
+                break
+        rows.append({**sample, "outcome": outcome, "forward_atr": (close[end] - close[i]) / unit})
+
+    by_bullish = [_bucket_stats(name, [r for r in rows if lo <= r["bullish_pct"] < hi]) for lo, hi, name in BULLISH_BUCKETS]
+    judged = [b for b in by_bullish if b["observed_up_pct"] is not None and b["up_first"] + b["down_first"] >= MIN_RESOLVED]
+    weight = sum(b["up_first"] + b["down_first"] for b in judged)
+    gap = sum(abs(b["observed_up_pct"] - b["stated_bullish_pct"]) * (b["up_first"] + b["down_first"]) for b in judged) / weight if weight else None
+    directional = [r for r in rows if r["direction"]]
+    return {
+        "samples": len(rows),
+        "horizon_bars": horizon,
+        "touch_atr": CALIBRATION_TOUCH_ATR,
+        "mean_abs_gap_pts": round(gap, 1) if gap is not None else None,
+        "by_bullish_pct": by_bullish,
+        "by_label": [_bucket_stats(label, [r for r in rows if r["label"] == label]) for label in sorted({r["label"] for r in rows})],
+        "by_confidence": [_bucket_stats(name, [r for r in directional if lo <= r["confidence"] < hi]) for lo, hi, name in CONFIDENCE_BUCKETS],
+        "method": (f"At every evaluated bar: did price touch +{CALIBRATION_TOUCH_ATR:g} ATR or −{CALIBRATION_TOUCH_ATR:g} ATR first within "
+                   f"{horizon} bars{' (same session)' if same_session else ''}? Observed up % = up-first ÷ (up-first + down-first). "
+                   "Hit % counts touches in the signal's own direction."),
+        "note": (f"A calibrated engine shows observed ≈ stated. Buckets with fewer than {MIN_RESOLVED} resolved bars are noise; "
+                 "the mean gap uses only buckets above that. Bars overlap, so neighbouring samples are not independent."),
+    }
+
+
+def _bucket_stats(name: str, group: list[dict]) -> dict:
+    up = sum(r["outcome"] == "up" for r in group)
+    down = sum(r["outcome"] == "down" for r in group)
+    pointed = [r for r in group if r["direction"]]
+    hits = sum(r["outcome"] == ("up" if r["direction"] > 0 else "down") for r in pointed)
+    misses = sum(r["outcome"] == ("down" if r["direction"] > 0 else "up") for r in pointed)
+    return {
+        "bucket": name,
+        "samples": len(group),
+        "up_first": up,
+        "down_first": down,
+        "neither": sum(r["outcome"] == "neither" for r in group),
+        "ambiguous": sum(r["outcome"] == "ambiguous" for r in group),
+        "stated_bullish_pct": round(float(np.mean([r["bullish_pct"] for r in group])), 1) if group else None,
+        "observed_up_pct": round(up / (up + down) * 100, 1) if up + down else None,
+        "avg_forward_atr": round(float(np.mean([r["forward_atr"] for r in group])), 3) if group else None,
+        "directional_samples": len(pointed),
+        "hit_pct": round(hits / (hits + misses) * 100, 1) if hits + misses else None,
+        "avg_forward_atr_in_direction": round(float(np.mean([r["direction"] * r["forward_atr"] for r in pointed])), 3) if pointed else None,
     }
 
 

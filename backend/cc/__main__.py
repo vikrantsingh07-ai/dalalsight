@@ -1,17 +1,23 @@
-"""Start DalalSight: ``python -m cc`` (from the ``backend`` directory or with the package installed)."""
+"""Start DalalSight: ``python -m cc``. ``python -m cc --check`` runs the deployment preflight instead."""
 
 from __future__ import annotations
 
 import logging
+import sys
 
 import uvicorn
 
 from .config import LOOPBACK_HOSTS, EnvConfig, load_environment
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    args = sys.argv[1:] if argv is None else argv
     load_environment()
     env = EnvConfig.from_env()
+    if "--check" in args:
+        from .preflight import run
+
+        raise SystemExit(run(env))
     if env.host not in LOOPBACK_HOSTS and not env.access_token:
         # Without a token, anyone who can reach the host could change settings, place paper orders and spend the AI budget.
         raise SystemExit(f"Refusing to listen on {env.host}: set CC_ACCESS_TOKEN to a long random string first.")

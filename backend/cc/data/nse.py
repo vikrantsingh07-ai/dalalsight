@@ -160,7 +160,7 @@ class NSEPublicProvider(MarketDataProvider):
             frame["volume"] = np.nan
             frame = frame.dropna(subset=["close"])
         elif timeframe in ("1D", "1W"):
-            end = date.today()
+            end = datetime.now(IST).date()  # IST, not the server clock (a UTC host is a day behind before 05:30 IST)
             start = end - timedelta(days=730)
             history = self.cache.get_or_set(
                 ("nse_index_history", info.nse_name, start), 3600,

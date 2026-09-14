@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { humanize, istTime, num, pct } from "../lib/format";
 import { NO_TRADE, type Levels, type Provenance, type Regime, type Snapshot, type TechEvent, type Technical, type TradePlan } from "../lib/types";
 import { TEXT_TONES, toneForLabel, toneForPriority } from "../lib/tones";
+import CalibrationNote from "./CalibrationNote";
 import { Card, Empty, Meter, Pill, Stat, Table, UnavailableNote } from "./ui";
 
 export function ScenarioBar({ bullish }: { bullish: number }) {
@@ -66,6 +67,7 @@ export function SignalPanel({ snap }: { snap: Snapshot }) {
         {snap.forming_bar_excluded ? " · forming bar excluded from analysis" : ""}
       </div>
       <ScenarioBar bullish={signal.bullish_pct} />
+      <CalibrationNote symbol={snap.symbol} timeframe={snap.timeframe} bullish={signal.bullish_pct} />
       <div className="mt-3 grid grid-cols-3 gap-2">
         <Stat label="Model confidence" value={`${num(signal.model_confidence, 1)}%`} />
         <Stat label="Data coverage" value={`${num(signal.coverage * 100, 0)}%`} />

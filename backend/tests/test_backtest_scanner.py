@@ -2,7 +2,14 @@ import pandas as pd
 import pytest
 from helpers import make_ohlcv
 
-from cc.analysis.backtest import BacktestParams, _check_exit, _try_fill, evaluate_signal_outcome, run_backtest
+from cc.analysis.backtest import (
+    BacktestParams,
+    _check_exit,
+    _try_fill,
+    calibrate,
+    evaluate_signal_outcome,
+    run_backtest,
+)
 from cc.analysis.scanner import compute_stock_metrics, run_preset, score_stock
 from cc.analysis.signal_engine import LABEL_BEAR, LABEL_BULL, LABEL_HIGH_RISK, LABEL_LOW_QUALITY
 from cc.config import RuntimeSettings, SignalSettings
@@ -58,6 +65,36 @@ def test_limit_entry_fills_at_zone_midpoint_or_better():
     short = {**pending, "direction": -1, "limit": 100.0, "stop": 102.0, "target": 96.0}
     filled, _ = _try_fill(short, pd.Series({"open": 99.0, "high": 100.4, "low": 98.8, "close": 100.1}), 1, ts, 0.0002)
     assert filled["entry"] == pytest.approx(100.0 * (1 - 0.0002))
+
+
+def test_backtest_calibration_accounts_for_every_bar():
+    frame = make_ohlcv(700, drift=0.0003, vol=0.0015, seed=21)
+    calibration = run_backtest(frame, params(), RuntimeSettings(), intraday=True)["summary"]["calibration"]
+    buckets = calibration["by_bullish_pct"]
+    assert calibration["samples"] > 0 and len(buckets) == 6
+    assert sum(b["samples"] for b in buckets) == calibration["samples"]
+    for b in buckets:
+        assert b["up_first"] + b["down_first"] + b["neither"] + b["ambiguous"] == b["samples"]
+        assert b["observed_up_pct"] is None or 0 <= b["observed_up_pct"] <= 100
+
+
+def test_calibration_outcomes_on_a_known_path():
+    index = pd.date_range("2026-09-11 09:15", periods=6, freq="5min", tz=IST)
+    ind = pd.DataFrame({"open": 100.0, "high": [100.5, 100.8, 102.0, 100.5, 100.2, 100.1],
+                        "low": [99.5, 99.6, 100.0, 98.9, 99.9, 99.8], "close": [100.0, 100.5, 101.5, 99.0, 100.0, 100.0],
+                        "atr": 1.0}, index=index)
+    samples = [{"i": 0, "bullish_pct": 70.0, "confidence": 60.0, "label": LABEL_BULL, "direction": 1},
+               {"i": 2, "bullish_pct": 30.0, "confidence": 60.0, "label": LABEL_BEAR, "direction": -1},
+               {"i": 5, "bullish_pct": 50.0, "confidence": 0.0, "label": "NO TRADE / WAIT FOR CONFIRMATION", "direction": 0}]
+    result = calibrate(ind, samples, horizon=3, same_session=True)
+    assert result["samples"] == 2  # the last bar has nothing after it to judge
+    buckets = {b["bucket"]: b for b in result["by_bullish_pct"]}
+    assert (buckets["65–100"]["up_first"], buckets["65–100"]["observed_up_pct"]) == (1, 100.0)  # +1 ATR touched on bar 2
+    assert (buckets["0–35"]["down_first"], buckets["0–35"]["observed_up_pct"]) == (1, 0.0)  # −1 ATR touched on bar 3
+    labels = {b["bucket"]: b for b in result["by_label"]}
+    assert labels[LABEL_BULL]["hit_pct"] == 100.0 and labels[LABEL_BULL]["avg_forward_atr_in_direction"] == -1.0
+    assert labels[LABEL_BEAR]["hit_pct"] == 100.0 and labels[LABEL_BEAR]["avg_forward_atr_in_direction"] == 1.5
+    assert result["mean_abs_gap_pts"] is None  # too few resolved bars to judge
 
 
 def _bars(rows: list[tuple[float, float, float, float]]) -> pd.DataFrame:

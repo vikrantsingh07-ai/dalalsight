@@ -60,10 +60,23 @@ class BacktestService:
             row["params"], row["summary"], row["trades"] = loads(row["params"]), loads(row["summary"]), loads(row["trades"])
         return row
 
+    def latest_calibration(self, symbol: str, timeframe: str) -> dict | None:
+        """Calibration from the newest completed backtest of this symbol and timeframe (older runs may predate it)."""
+        rows = self.db.query(
+            "SELECT id, created_at, summary FROM backtests WHERE status = 'completed' AND json_extract(params, '$.symbol') = ? "
+            "AND json_extract(params, '$.timeframe') = ? ORDER BY id DESC LIMIT 20", (symbol, timeframe))
+        for row in rows:
+            summary = loads(row["summary"]) or {}
+            if summary.get("calibration"):
+                return {"backtest_id": row["id"], "created_at": row["created_at"], "period": summary["period"],
+                        "data_source": summary.get("data_source"), **summary["calibration"]}
+        return None
+
     def list(self, limit: int = 50) -> list[dict]:
         rows = self.db.query("SELECT id, created_at, status, params, summary, error FROM backtests ORDER BY id DESC LIMIT ?", (limit,))
         for row in rows:
             row["params"], row["summary"] = loads(row["params"]), loads(row["summary"])
             if row["summary"]:
                 row["summary"].pop("equity_curve_r", None)
+                row["summary"].pop("calibration", None)
         return rows

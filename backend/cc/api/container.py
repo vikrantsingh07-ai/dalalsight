@@ -95,7 +95,7 @@ def build_services(env: EnvConfig, *, db: Database | None = None, provider: Mark
     replay = ReplayService(analysis, commentary, bus, timeline, settings)
     backtests = BacktestService(db, analysis, settings, timeline, bus)
     started_at = now_ist()
-    health = HealthService(env, db, provider, models, bus, monitor, settings_store, timeline, started_at)
+    health = HealthService(env, db, provider, models, bus, monitor, settings_store, timeline, started_at, registry)
     return Services(env, db, bus, cache, registry, provider, settings_store, timeline, models, analysis, options, stocks,
                     commentary, alerts, signals, paper, orchestrator, assistant, monitor, replay, backtests, health, RateLimiter(),
                     started_at)

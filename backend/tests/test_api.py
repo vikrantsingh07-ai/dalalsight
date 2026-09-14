@@ -154,6 +154,9 @@ def test_backtest_and_replay_jobs(client, services):
     assert job.status_code == 202
     done = wait_for(lambda: (lambda row: row if row["status"] != "running" else None)(client.get(f"/api/backtest/{job.json()['id']}").json()))
     assert done["status"] == "completed", done.get("error")
+    calibration = client.get("/api/calibration/NIFTY?timeframe=5m").json()
+    assert calibration["available"] and calibration["backtest_id"] == job.json()["id"] and len(calibration["by_bullish_pct"]) == 6
+    assert client.get("/api/calibration/NIFTY?timeframe=1h").json()["available"] is False
     started = client.post("/api/replay/start", json={"symbol": "NIFTY", "timeframe": "5m", "interval_seconds": 0.1})
     assert started.status_code == 200 and started.json()["running"]
     wait_for(lambda: client.get("/api/replay/status").json().get("processed", 0) >= 2)
@@ -176,6 +179,9 @@ def test_access_token_protects_api_and_websocket(registry, provider):
         assert c.get("/api/status").status_code == 401
         assert c.get("/api/status", headers={"X-Access-Token": "tok-123"}).status_code == 200
         assert c.get("/api/status", headers={"Authorization": "Bearer wrong"}).status_code == 401
+        for path in ("/api/docs", "/api/openapi.json"):
+            assert c.get(path).status_code == 401, path
+            assert c.get(path, headers={"X-Access-Token": "tok-123"}).status_code == 200, path
         with pytest.raises(WebSocketDisconnect), c.websocket_connect("/ws") as ws:
             ws.receive_json()
         protocol = "cc-token." + base64.urlsafe_b64encode(b"tok-123").decode().rstrip("=")

@@ -73,6 +73,10 @@ the keys. TradingView runs separately in your TradingView app with the Pine indi
   - For intraday index bars it merges Yahoo history with today's NSE ticks.
   - It attaches **provenance** (source, timestamp, delay) to every result.
 - `brokers.py` holds Kite/Upstox/Dhan slots. They report exactly which credentials they need; they don't pretend to work.
+- `symbols.py` maps symbols and loads the NSE reference lists (equity list, F&O lot sizes, index constituents). They are
+  downloaded at most daily and reloaded daily. When a download fails it uses the last downloaded copy, then the real
+  snapshot bundled in `data/reference_seed/` (dated in its `manifest.json`), and retries hourly. System Health shows
+  each list's source and date.
 - `cache.py` is a TTL cache with per-key locks. `market_hours.py` is the IST session calendar (pre-open, open, closing, closed, holiday).
 - A failing feed raises `DataUnavailable(what, reason, source, requirement)`. The UI shows that message instead of a number.
 
@@ -104,7 +108,10 @@ flowchart LR
   - `strategies.py` builds multi-leg option strategies with payoff, probability of profit and capital.
   - `hedging.py` sizes hedges.
   - `scanner.py` scores stocks with transparent sub-scores.
-  - `backtest.py` replays history walk-forward with limit entries at the zone midpoint.
+  - `backtest.py` replays history walk-forward with limit entries at the zone midpoint. It also **calibrates** the
+    engine: at every evaluated bar it records the stated bullish % and confidence, then checks whether price touched
+    +1 ATR or −1 ATR first within the hold window (same session for intraday). The Backtest tab shows stated vs observed
+    per bullish-% bucket, the hit rate per label and per confidence bucket, and the mean gap in points.
 
 ## 5. The market monitor (`backend/cc/services/monitor.py`)
 
@@ -159,6 +166,7 @@ the whole pipeline and writes a report.
 - **Keys and access:**
   - Keys live only in the backend `.env`. `EnvConfig.public()` reports only whether a key is set.
   - `CC_ACCESS_TOKEN` protects REST (the `X-Access-Token` header) and the WebSocket (sent as a subprotocol, never in the URL).
+    It also guards `/api/docs` and `/api/openapi.json`, so a public server doesn't publish its API map.
 - **Limits and input:** expensive endpoints are rate limited. Inputs are validated with pydantic.
 - **Data honesty:** no fabricated data. Unavailable feeds are reported as unavailable, and AI numbers are cross-checked.
 
@@ -181,7 +189,10 @@ SQLite in WAL mode with versioned migrations. Tables:
 - **Hosting:** when the dashboard is hosted apart from the API (Vercel), `VITE_API_BASE_URL` and optionally `VITE_WS_URL` point it
   at the backend. See [DEPLOYMENT.md](DEPLOYMENT.md).
 - **Charts:** charts open in TradingView through links. `tradingview/dalalsight_signal_engine.pine` mirrors the signal engine on
-  your TradingView chart. Option data isn't available in Pine, so that weight counts as unavailable there.
+  your TradingView chart. It uses the same default weights, thresholds, crossover and VWAP rules, and builds levels the
+  same way (session OHLC, last 5 confirmed swings each side, EMA slow, SMA 50/200, VWAP, merged within 0.15 ATR).
+  Option data isn't available in Pine, so that weight counts as unavailable there, and the volume-profile and
+  option-OI levels are skipped. `backend/tests/test_pine_sync.py` fails if the Pine defaults or labels drift.
 
 ## 11. API map
 
@@ -195,7 +206,7 @@ SQLite in WAL mode with versioned migrations. Tables:
 | AI | `GET /api/agents/meta`, `POST /agents/run`, `GET /agents/runs[/{id}]`, `GET /commentary`, `POST /assistant/chat`, `GET /assistant/history` |
 | Alerts | `GET/POST /api/alerts`, `PUT/DELETE /alerts/{id}`, `GET /alerts/events`, `POST /alerts/test` |
 | Signals & paper | `GET /api/signals`, `/signals/stats`, `POST /signals/evaluate`, `GET/POST /paper/orders`, `GET /paper/positions` |
-| Backtest & replay | `POST/GET /api/backtest`, `GET /backtest/{id}`, `POST /replay/start`, `/replay/stop`, `GET /replay/status` |
+| Backtest & replay | `POST/GET /api/backtest`, `GET /backtest/{id}`, `GET /calibration/{symbol}?timeframe=` (newest backtest's calibration, shown as "Track record" under the live signal), `POST /replay/start`, `/replay/stop`, `GET /replay/status` |
 | TradingView | `GET /api/tradingview/pine` |
 | Push | `WS /ws`: hello, snapshots, signals, alerts, commentary, timeline, agent progress |
 
@@ -204,5 +215,8 @@ Interactive docs are at `/api/docs` while the server runs.
 ## 12. Tests
 
 - `backend/tests`: offline tests with fake providers. They cover indicators, market hours, engines, options,
-  strategies, hedging, backtest, scanner, AI validation, alerts, orchestration, the adapter budget, the API, security, CORS and the public-bind guard.
+  strategies, hedging, backtest and calibration, scanner, AI validation, alerts, orchestration, the adapter budget, the
+  API, security (including the docs guard), CORS, the public-bind guard, reference-data fallbacks, the preflight and
+  Pine/engine sync.
+- `python -m cc --check`: the live preflight (config plus real NSE, Yahoo, reference-list and AI model access).
 - `packages/tradingagents/tests`: the upstream suite plus the India tests.

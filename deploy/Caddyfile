@@ -1,0 +1,6 @@
+# DalalSight API over HTTPS. Caddy obtains the certificate and passes WebSocket upgrades through.
+# deploy/setup-ubuntu.sh replaces __DOMAIN__ and installs this as /etc/caddy/Caddyfile.
+__DOMAIN__ {
+	encode gzip
+	reverse_proxy 127.0.0.1:8765
+}

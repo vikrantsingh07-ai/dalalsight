@@ -74,7 +74,8 @@ def create_app(env: EnvConfig | None = None, services: Services | None = None, s
     @app.middleware("http")
     async def guard(request: Request, call_next):
         path = request.url.path
-        if env.access_token and path.startswith("/api") and path not in ("/api/docs", "/api/openapi.json"):
+        # The docs and OpenAPI schema are guarded too: a public server must not publish its API map.
+        if env.access_token and path.startswith("/api"):
             provided = request.headers.get("x-access-token") or request.headers.get("authorization", "").removeprefix("Bearer ").strip()
             if not token_ok(env.access_token, provided):
                 return respond({"detail": "access token required"}, 401)

@@ -1,0 +1,41 @@
+{
+  "downloaded_on": "2026-09-14",
+  "note": "Real NSE / NSE Indices files, used only when a server cannot download the current lists. Refresh with a new download before relying on lot sizes.",
+  "files": {
+    "EQUITY_L.csv": {
+      "url": "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv",
+      "downloaded_on": "2026-09-14",
+      "bytes": 183893
+    },
+    "fo_mktlots.csv": {
+      "url": "https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv",
+      "downloaded_on": "2026-09-14",
+      "bytes": 47306
+    },
+    "ind_nifty50list.csv": {
+      "url": "https://niftyindices.com/IndexConstituent/ind_nifty50list.csv",
+      "downloaded_on": "2026-09-14",
+      "bytes": 3403
+    },
+    "ind_niftybanklist.csv": {
+      "url": "https://niftyindices.com/IndexConstituent/ind_niftybanklist.csv",
+      "downloaded_on": "2026-09-14",
+      "bytes": 931
+    },
+    "ind_niftynext50list.csv": {
+      "url": "https://niftyindices.com/IndexConstituent/ind_niftynext50list.csv",
+      "downloaded_on": "2026-09-14",
+      "bytes": 3356
+    },
+    "ind_nifty100list.csv": {
+      "url": "https://niftyindices.com/IndexConstituent/ind_nifty100list.csv",
+      "downloaded_on": "2026-09-14",
+      "bytes": 6712
+    },
+    "ind_nifty500list.csv": {
+      "url": "https://niftyindices.com/IndexConstituent/ind_nifty500list.csv",
+      "downloaded_on": "2026-09-14",
+      "bytes": 33321
+    }
+  }
+}

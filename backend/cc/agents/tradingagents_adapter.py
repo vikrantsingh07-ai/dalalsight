@@ -13,7 +13,6 @@ import json
 import os
 import re
 import time
-from datetime import date
 
 import openai
 from langchain_core.callbacks import BaseCallbackHandler
@@ -316,7 +315,7 @@ class TradingAgentsAdapter:
         model = self._model(30)
         usage = UsageCallback(self.models, model, deadline=time.monotonic() + 4 * self.max_minutes * 60)
         asset_type, _ = ta_symbol_info(symbol)
-        trade_date = date.today().isoformat()
+        trade_date = now_ist().date().isoformat()
         graph = TradingAgentsGraph(selected_analysts=analysts, config=self._config(model), callbacks=[usage])
         final_state, rating = graph.propagate(symbol, trade_date, asset_type=asset_type)
         reports = {agent: final_state.get(REPORT_KEYS[agent], "") for agent in analysts}

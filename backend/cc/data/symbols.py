@@ -1,26 +1,35 @@
 """Symbol registry: maps dashboard symbols to Yahoo, NSE, TradingView and option-chain identifiers.
 
-Reference lists (NSE equity list, F&O lot sizes, index constituents) are downloaded at most
-once a day and kept on disk; a stale-but-real copy is preferred over no data.
+Reference lists (NSE equity list, F&O lot sizes, index constituents) are downloaded at most once a day and kept
+on disk. When a download fails, a stale-but-real copy is preferred over no data: first the last downloaded file,
+then the snapshot bundled in ``reference_seed/`` (NSE often refuses a new cloud server). Each list records where it
+came from and how old it is, for System Health.
 """
 
 from __future__ import annotations
 
 import io
+import json
 import re
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import requests
 from tradingagents.dataflows.india.nse_client import _BROWSER_UA, _nse_session
 
-from .models import DataUnavailable, InstrumentMeta
+from .models import IST, DataUnavailable, InstrumentMeta
 
 SYMBOL_RE = re.compile(r"^[A-Z0-9][A-Z0-9&\-]{0,19}$")
 DAY = 24 * 3600
+RETRY_SECONDS = 3600  # a list served from a stale or bundled copy is downloaded again after this long
+SEED_DIR = Path(__file__).resolve().parent / "reference_seed"
+CURRENT_SOURCES = ("download", "cache")
 
 
 @dataclass(frozen=True)
@@ -78,14 +87,26 @@ CONSTITUENT_FILES = {
 }
 
 
+def seed_date() -> str:
+    """Date the bundled reference snapshot was downloaded (from ``reference_seed/manifest.json``)."""
+    try:
+        return str(json.loads((SEED_DIR / "manifest.json").read_text(encoding="utf-8"))["downloaded_on"])
+    except (OSError, ValueError, KeyError):
+        return "unknown date"
+
+
+def _file_date(path: Path) -> str:
+    return datetime.fromtimestamp(path.stat().st_mtime, IST).date().isoformat()
+
+
 class SymbolRegistry:
     def __init__(self, cache_dir: Path):
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
-        self._equities: dict[str, str] | None = None
-        self._lots: dict[str, int] | None = None
-        self._constituents: dict[str, list[dict]] = {}
+        self._parsed: dict[str, tuple[float, Any]] = {}
+        # file name -> {"source": download | cache | stale cache | bundled snapshot, "as_of": YYYY-MM-DD, "detail": str}
+        self.reference_status: dict[str, dict[str, str]] = {}
 
     # ------------------------------------------------------------------ normalisation
     def normalize(self, raw: str) -> str:
@@ -109,9 +130,13 @@ class SymbolRegistry:
         return INDEX_TABLE.get(symbol)
 
     # ------------------------------------------------------------------ reference lists
+    def _note(self, name: str, source: str, as_of: str, detail: str = "") -> None:
+        self.reference_status[name] = {"source": source, "as_of": as_of, "detail": detail}
+
     def _cached_text(self, name: str, url: str, max_age: float, via_nse_session: bool) -> str:
         path = self.cache_dir / name
         if path.exists() and time.time() - path.stat().st_mtime < max_age:
+            self._note(name, "cache", _file_date(path))
             return path.read_text(encoding="utf-8")
         try:
             if via_nse_session:
@@ -121,43 +146,64 @@ class SymbolRegistry:
             if resp.status_code != 200 or "html" in resp.headers.get("content-type", "").lower():
                 raise RuntimeError(f"HTTP {resp.status_code}")
             path.write_text(resp.text, encoding="utf-8")
+            self._note(name, "download", _file_date(path))
             return resp.text
         except Exception as exc:  # noqa: BLE001
+            reason = f"download failed: {type(exc).__name__}: {str(exc)[:160]}"
             if path.exists():
+                self._note(name, "stale cache", _file_date(path), reason)
                 return path.read_text(encoding="utf-8")
+            seed = SEED_DIR / name
+            if seed.exists():
+                self._note(name, "bundled snapshot", seed_date(), reason)
+                return seed.read_text(encoding="utf-8")
             raise DataUnavailable(name, f"{type(exc).__name__}: {exc}", url) from exc
 
+    def _reference(self, name: str, url: str, via_nse_session: bool, parse: Callable[[str], Any]) -> Any:
+        """A parsed reference list, reloaded daily, or hourly while it comes from a stale or bundled copy.
+
+        Call with ``self._lock`` held.
+        """
+        loaded = self._parsed.get(name)
+        current = self.reference_status.get(name, {}).get("source") in CURRENT_SOURCES
+        if loaded is not None and time.time() - loaded[0] < (DAY if current else RETRY_SECONDS):
+            return loaded[1]
+        try:
+            value = parse(self._cached_text(name, url, DAY, via_nse_session))
+        except DataUnavailable:
+            if loaded is None:
+                raise
+            value = loaded[1]  # keep serving the copy already in memory
+        self._parsed[name] = (time.time(), value)
+        return value
+
     def equities(self) -> dict[str, str]:
+        def parse(text: str) -> dict[str, str]:
+            frame = pd.read_csv(io.StringIO(text))
+            frame.columns = [c.strip() for c in frame.columns]
+            return dict(zip(frame["SYMBOL"].str.strip(), frame["NAME OF COMPANY"].str.strip(), strict=False))
+
         with self._lock:
-            if self._equities is None:
-                text = self._cached_text(
-                    "EQUITY_L.csv", "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv", DAY, True
-                )
-                frame = pd.read_csv(io.StringIO(text))
-                frame.columns = [c.strip() for c in frame.columns]
-                self._equities = dict(zip(frame["SYMBOL"].str.strip(), frame["NAME OF COMPANY"].str.strip(), strict=False))
-            return self._equities
+            return self._reference("EQUITY_L.csv", "https://nsearchives.nseindia.com/content/equities/EQUITY_L.csv", True, parse)
 
     def lot_sizes(self) -> dict[str, int]:
+        def parse(text: str) -> dict[str, int]:
+            frame = pd.read_csv(io.StringIO(text))
+            frame.columns = [c.strip() for c in frame.columns]
+            lots: dict[str, int] = {}
+            month_cols = [c for c in frame.columns if c not in ("UNDERLYING", "SYMBOL")]
+            for _, row in frame.iterrows():
+                symbol = str(row["SYMBOL"]).strip()
+                for col in month_cols:
+                    try:
+                        lots[symbol] = int(float(str(row[col]).strip()))
+                        break
+                    except ValueError:
+                        continue
+            return lots
+
         with self._lock:
-            if self._lots is None:
-                text = self._cached_text(
-                    "fo_mktlots.csv", "https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv", DAY, True
-                )
-                frame = pd.read_csv(io.StringIO(text))
-                frame.columns = [c.strip() for c in frame.columns]
-                lots: dict[str, int] = {}
-                month_cols = [c for c in frame.columns if c not in ("UNDERLYING", "SYMBOL")]
-                for _, row in frame.iterrows():
-                    symbol = str(row["SYMBOL"]).strip()
-                    for col in month_cols:
-                        try:
-                            lots[symbol] = int(float(str(row[col]).strip()))
-                            break
-                        except ValueError:
-                            continue
-                self._lots = lots
-            return self._lots
+            return self._reference("fo_mktlots.csv", "https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv", True, parse)
 
     def fno_stocks(self) -> list[str]:
         return sorted(s for s in self.lot_sizes() if s not in INDEX_TABLE and SYMBOL_RE.match(s))
@@ -165,17 +211,18 @@ class SymbolRegistry:
     def constituents(self, index_name: str = "NIFTY 50") -> list[dict]:
         if index_name not in CONSTITUENT_FILES:
             raise DataUnavailable(index_name, "no constituent list configured for this index")
+        file = CONSTITUENT_FILES[index_name]
+
+        def parse(text: str) -> list[dict]:
+            frame = pd.read_csv(io.StringIO(text))
+            frame.columns = [c.strip() for c in frame.columns]
+            return [
+                {"symbol": str(r["Symbol"]).strip(), "name": str(r["Company Name"]).strip(), "industry": str(r["Industry"]).strip()}
+                for _, r in frame.iterrows()
+            ]
+
         with self._lock:
-            if index_name not in self._constituents:
-                file = CONSTITUENT_FILES[index_name]
-                text = self._cached_text(file, f"https://niftyindices.com/IndexConstituent/{file}", DAY, False)
-                frame = pd.read_csv(io.StringIO(text))
-                frame.columns = [c.strip() for c in frame.columns]
-                self._constituents[index_name] = [
-                    {"symbol": str(r["Symbol"]).strip(), "name": str(r["Company Name"]).strip(), "industry": str(r["Industry"]).strip()}
-                    for _, r in frame.iterrows()
-                ]
-            return self._constituents[index_name]
+            return self._reference(file, f"https://niftyindices.com/IndexConstituent/{file}", False, parse)
 
     def sector(self, symbol: str) -> str | None:
         for index_name in ("NIFTY 500", "NIFTY 50"):

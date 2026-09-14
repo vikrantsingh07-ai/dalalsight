@@ -5,6 +5,7 @@ import { post } from "../lib/api";
 import { istTime, num, pct } from "../lib/format";
 import { useApi, useEvents, useLocalState } from "../lib/hooks";
 import type { BacktestRow, SignalRow } from "../lib/types";
+import CalibrationCard from "../components/CalibrationCard";
 import { LineSpark } from "../components/charts";
 import { TEXT_TONES, toneForLabel, toneForNumber, toneForStatus } from "../lib/tones";
 import { Button, Card, Checkbox, Empty, ErrorNote, Field, Input, Meter, PageHeader, Pill, Select, Stat, Table, Tabs } from "../components/ui";
@@ -524,6 +525,7 @@ function Backtests() {
                   {summary.data_source && <li>· data: {summary.data_source}</li>}
                 </ul>
               </Card>
+              {summary.calibration && <CalibrationCard calibration={summary.calibration} />}
               <Card title="Trades" bodyClass="max-h-[420px] overflow-auto p-0">
                 <Table>
                   <thead>

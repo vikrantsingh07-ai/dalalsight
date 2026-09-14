@@ -10,12 +10,15 @@ from .. import __version__
 from ..config import EnvConfig
 from ..data.brokers import BROKERS
 from ..data.models import now_ist
+from ..data.symbols import CURRENT_SOURCES
 
 CORE = {"Database", "Market data provider", "Market monitor"}
 
 
 class HealthService:
-    def __init__(self, env: EnvConfig, db, provider, models, bus, monitor, settings_store, timeline, started_at: datetime):
+    def __init__(self, env: EnvConfig, db, provider, models, bus, monitor, settings_store, timeline, started_at: datetime,
+                 registry=None):
+        self.registry = registry
         self.env = env
         self.db = db
         self.provider = provider
@@ -41,6 +44,14 @@ class HealthService:
         for child in getattr(self.provider, "child_health", lambda: [])():
             add(f"Feed · {child.name}", child.status, child.last_error if child.status != "ONLINE" and child.last_error else child.detail,
                 last_success=child.last_success.isoformat() if child.last_success else None, latency_ms=child.latency_ms)
+
+        refs = dict(getattr(self.registry, "reference_status", None) or {})
+        if refs:
+            behind = [f"{name}: {s['source']} from {s['as_of']}" for name, s in sorted(refs.items()) if s["source"] not in CURRENT_SOURCES]
+            add("Reference data", "DEGRADED" if behind else "ONLINE",
+                "; ".join(behind) if behind else f"{len(refs)} NSE reference list(s) current", files=refs)
+        else:
+            add("Reference data", "ONLINE", "not loaded yet (equity list, F&O lot sizes and index constituents load on first use)")
 
         ai = self.models.status()
         add("AI model", ai["status"], f"active: {ai['active_model'] or 'none'} · calls today {ai['calls_today']}/{ai['daily_budget']}",

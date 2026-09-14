@@ -39,61 +39,54 @@ monitor. Hosting the backend on an always-on server keeps the code as it is.
 
 Pick **one** option.
 
+### First: test the host with the preflight
+
+NSE's public site often refuses cloud and overseas IP addresses, so check a server **before** you commit to it. On the
+server (or any machine), from the repository root:
+
+```bash
+.venv/bin/python -m cc --check        # Windows: .venv\Scripts\python.exe -m cc --check
+```
+
+It prints PASS / WARN / FAIL for the configuration (access token, dev mode, CORS, AI key, data folder, built
+dashboard) and for live access to NSE quotes and option chains, Yahoo, the NSE reference lists and the AI model list.
+It makes no AI calls and exits non-zero when anything fails. If the NSE lines fail on a server, pick another region or
+provider.
+
 ### Option A: VPS in India (recommended for NSE data)
 
-Any Ubuntu VPS with 2 GB+ RAM in a Mumbai/Bangalore region.
+Any Ubuntu 24.04 VPS with 2 GB+ RAM in a Mumbai/Bangalore region. `deploy/` has everything:
 
-```bash
-sudo apt update && sudo apt install -y python3.12 python3.12-venv git caddy
-git clone https://github.com/vikrantsingh07-ai/dalalsight.git /opt/cc
-cd /opt/cc
-python3.12 -m venv .venv
-.venv/bin/pip install -e packages/tradingagents -e .
-cp .env.example .env
-```
+| File | What it does |
+|---|---|
+| `deploy/setup-ubuntu.sh` | installs Python 3.12 and Caddy, creates the `dalalsight` service user, installs the app, sets the server values in `.env` (generates `CC_ACCESS_TOKEN` if empty), starts the service behind Caddy, runs the preflight |
+| `deploy/dalalsight.service` | the systemd unit (template) |
+| `deploy/Caddyfile` | HTTPS + WebSocket reverse proxy (template) |
 
-Edit `/opt/cc/.env`:
+1. Point a domain (e.g. `api.yourdomain.com`) at the VPS with a DNS A record, so Caddy can get the certificate.
+2. Clone and run the setup (the repo is private, so sign in to GitHub on the server):
 
-```ini
-CC_HOST=127.0.0.1            # Caddy in front terminates HTTPS
-CC_PORT=8765
-CC_DEV_MODE=false
-CC_ACCESS_TOKEN=<paste output of: python3 -c "import secrets; print(secrets.token_urlsafe(32))">
-CC_CORS_ORIGINS=https://your-app.vercel.app
-OPENROUTER_API_KEY=<your key>
-TRADINGAGENTS_MARKET=india
-```
+   ```bash
+   git clone https://github.com/vikrantsingh07-ai/dalalsight.git /opt/dalalsight
+   cd /opt/dalalsight
+   sudo bash deploy/setup-ubuntu.sh api.yourdomain.com https://your-app.vercel.app
+   ```
 
-Run it as a service, `/etc/systemd/system/cc.service`:
+   Leave out the second argument if you open the dashboard from this server instead of Vercel.
+3. Add your `OPENROUTER_API_KEY` to `/opt/dalalsight/.env`, then `sudo systemctl restart dalalsight`.
+4. Check it:
 
-```ini
-[Unit]
-Description=DalalSight
-After=network-online.target
+   ```bash
+   sudo grep CC_ACCESS_TOKEN /opt/dalalsight/.env
+   curl -H "X-Access-Token: <token>" https://api.yourdomain.com/api/status
+   journalctl -u dalalsight -f
+   ```
 
-[Service]
-WorkingDirectory=/opt/cc
-ExecStart=/opt/cc/.venv/bin/python -m cc
-Restart=always
-User=www-data
+After a `git pull`, run the setup script again; it keeps your `.env` values.
 
-[Install]
-WantedBy=multi-user.target
-```
-
-Point a domain (e.g. `api.yourdomain.com`) at the VPS. Caddy provides HTTPS and WebSocket upgrades automatically,
-`/etc/caddy/Caddyfile`:
-
-```text
-api.yourdomain.com {
-    reverse_proxy 127.0.0.1:8765
-}
-```
-
-```bash
-sudo chown -R www-data /opt/cc && sudo systemctl enable --now cc && sudo systemctl reload caddy
-curl -H "X-Access-Token: <token>" https://api.yourdomain.com/api/status
-```
+What the script writes to `.env`: `CC_HOST=127.0.0.1` (Caddy in front terminates HTTPS), `CC_PORT=8765`,
+`CC_DEV_MODE=false`, `CC_CORS_ORIGINS=<dashboard origin>`, `LIVE_EXECUTION_ENABLED=false`, and a random
+`CC_ACCESS_TOKEN` when none is set.
 
 ### Option B: Docker host (Render, Railway, Fly.io, …)
 
@@ -109,7 +102,10 @@ The repository's `Dockerfile` builds the API and the dashboard into one image.
 3. Attach a **persistent disk at `/app/data`**, otherwise signals, alerts and runs are lost on every deploy.
 4. Health check path: `/api/health` (send the token header if the platform allows; otherwise use a TCP check).
 
-The container binds `0.0.0.0` and refuses to start without `CC_ACCESS_TOKEN`.
+The container binds `0.0.0.0` and refuses to start without `CC_ACCESS_TOKEN`. After the first deploy, run
+`python -m cc --check` in the platform's shell to confirm the host can reach NSE. The image includes the bundled NSE
+reference snapshot (`backend/cc/data/reference_seed/`), so lot sizes and the equity list still work if NSE refuses the
+first download; System Health then shows "Reference data: DEGRADED" with the snapshot date until a download succeeds.
 
 ## Step 2: deploy the dashboard on Vercel
 
@@ -150,7 +146,8 @@ use the Docker image, which includes `web/dist`. Then open `https://api.yourdoma
 ## Security checklist
 
 - [ ] HTTPS everywhere (Caddy / platform TLS). Never expose port 8765 directly.
-- [ ] `CC_ACCESS_TOKEN` is long and random; `CC_DEV_MODE=false`.
+- [ ] `CC_ACCESS_TOKEN` is long and random; `CC_DEV_MODE=false`. The token also guards `/api/docs`.
+- [ ] `python -m cc --check` on the server shows no FAIL lines.
 - [ ] `CC_CORS_ORIGINS` lists only your dashboard URLs.
 - [ ] `LIVE_EXECUTION_ENABLED=false` (live execution is not implemented and stays refused).
 - [ ] `.env` is not committed; the OpenRouter key has been rotated if it was ever shared.

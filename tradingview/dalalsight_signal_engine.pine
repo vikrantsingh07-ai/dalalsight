@@ -4,6 +4,8 @@
 // Each component scores -1..+1 with a configurable weight. Composite S = sum(w*s) / sum(w) over the
 // components that have data; bullish scenario = 50 + 50*S; model confidence = agreeing weight /
 // available weight * data coverage. Weak evidence gives "NO TRADE / WAIT FOR CONFIRMATION".
+// Mirrors backend/cc/analysis/signal_engine.py. Pine has no option-chain data (the options component counts as
+// unavailable) and this script skips volume-profile levels, so levels can differ slightly from the dashboard.
 // Set alerts to "Once Per Bar Close" so they use completed bars. Research tool, not investment advice.
 indicator("DalalSight Signal Engine", shorttitle = "DalalSight", overlay = true, max_labels_count = 200, max_lines_count = 50)
 
@@ -69,6 +71,29 @@ nearBelow(array<float> lvls, float ref) =>
         if not na(v) and v < ref and (na(best) or v > best)
             best := v
     best
+
+// Merge levels closer than tol into their average, like the Python engine's level clustering.
+clusterLevels(array<float> raw, float tol) =>
+    array<float> vals = array.new<float>()
+    for v in raw
+        if not na(v)
+            array.push(vals, v)
+    array.sort(vals, order.ascending)
+    array<float> out = array.new<float>()
+    float groupSum = 0.0
+    int groupCount = 0
+    float prevV = na
+    for v in vals
+        if groupCount > 0 and v - prevV > tol
+            array.push(out, groupSum / groupCount)
+            groupSum := 0.0
+            groupCount := 0
+        groupSum := groupSum + v
+        groupCount := groupCount + 1
+        prevV := v
+    if groupCount > 0
+        array.push(out, groupSum / groupCount)
+    out
 
 agreeWeight(bool avail, float w, float s, int dir) =>
     avail and dir != 0 and math.sign(s) == dir and math.abs(s) >= 0.15 ? w : 0.0
@@ -165,18 +190,23 @@ for i = 0 to confirmBars - 1
     allNeg := allNeg and diff[i] < 0
 bullConfirm = diff[confirmBars] <= 0 and allPos and close > math.max(emaFast, emaSlow)
 bearConfirm = diff[confirmBars] >= 0 and allNeg and close < math.min(emaFast, emaSlow)
-crossUp = ta.crossover(emaFast, emaSlow)
-crossDown = ta.crossunder(emaFast, emaSlow)
+// same crossover test as the Python engine (previous bar on or through the other EMA)
+crossUp = emaFast[1] <= emaSlow[1] and emaFast > emaSlow
+crossDown = emaFast[1] >= emaSlow[1] and emaFast < emaSlow
 emaAvail = not na(emaSlow)
 emaSlopePct = emaFast[3] != 0 ? (emaFast - emaFast[3]) / emaFast[3] * 100 : 0.0
 stretch = atrVal > 0 ? (close - emaSlow) / atrVal : 0.0
 emaScore = clip((emaFast > emaSlow ? 0.5 : -0.5) + (bullConfirm ? 0.3 : bearConfirm ? -0.3 : crossUp ? 0.15 : crossDown ? -0.15 : 0.0) + (math.abs(emaSlopePct) > 0.01 ? 0.2 * math.sign(emaSlopePct) : 0.0) - (math.abs(stretch) > 2.5 ? 0.3 * math.sign(stretch) : 0.0))
 
-// VWAP
+// VWAP: reclaim / loss, else rejection (first match wins, as in the Python event detector)
 vwapAvail = not na(vwapVal)
-vwapBreak = vwapAvail and close[1] < vwapVal[1] and close > vwapVal + 0.05 * atrVal
-vwapLoss = vwapAvail and close[1] > vwapVal[1] and close < vwapVal - 0.05 * atrVal
-vwapScore = clip((close > vwapVal ? 0.6 : -0.6) + (vwapBreak ? 0.4 : vwapLoss ? -0.4 : 0.0))
+vwapPrevOk = vwapAvail and not na(vwapVal[1])
+vwapBuffer = atrVal > 0 ? 0.05 * atrVal : 0.0
+vwapBreak = vwapPrevOk and close[1] < vwapVal[1] and close > vwapVal + vwapBuffer
+vwapLoss = vwapPrevOk and not vwapBreak and close[1] > vwapVal[1] and close < vwapVal - vwapBuffer
+vwapRejBear = vwapPrevOk and not vwapBreak and not vwapLoss and high > vwapVal and close < vwapVal and close[1] < vwapVal[1]
+vwapRejBull = vwapPrevOk and not vwapBreak and not vwapLoss and not vwapRejBear and low < vwapVal and close > vwapVal and close[1] > vwapVal[1]
+vwapScore = clip((close > vwapVal ? 0.6 : -0.6) + (vwapBreak or vwapRejBull ? 0.4 : vwapLoss or vwapRejBear ? -0.4 : 0.0))
 
 // Market structure: confirmed swings (pivots need swingLb bars on each side, so no look-ahead)
 ph = ta.pivothigh(high, swingLb, swingLb)
@@ -185,16 +215,38 @@ var float h1 = na
 var float h2 = na
 var float l1 = na
 var float l2 = na
+var array<float> swingHighs = array.new<float>()
+var array<float> swingLows = array.new<float>()
 if not na(ph)
     h1 := h2
     h2 := ph
+    array.push(swingHighs, ph)
+    if array.size(swingHighs) > 5
+        array.shift(swingHighs)
 if not na(pl)
     l1 := l2
     l2 := pl
+    array.push(swingLows, pl)
+    if array.size(swingLows) > 5
+        array.shift(swingLows)
 pdh = request.security(syminfo.tickerid, "D", high[1], lookahead = barmerge.lookahead_on)
 pdl = request.security(syminfo.tickerid, "D", low[1], lookahead = barmerge.lookahead_on)
 pdc = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
-lvls = array.from(pdh, pdl, pdc, h1, h2, l1, l2, emaSlow, sma50, sma200, vwapVal)
+// session high / low so far (intraday only)
+var float dayHigh = na
+var float dayLow = na
+if timeframe.change("D") or na(dayHigh)
+    dayHigh := high
+    dayLow := low
+else
+    dayHigh := math.max(dayHigh, high)
+    dayLow := math.min(dayLow, low)
+// level candidates as in the Python levels engine: session OHLC, last 5 confirmed swings each side, EMA slow,
+// SMA 50/200 and VWAP, merged when closer than 0.15 ATR
+rawLevels = array.from(pdh, pdl, pdc, timeframe.isintraday ? dayHigh : na, timeframe.isintraday ? dayLow : na, emaSlow, sma50, sma200, vwapVal)
+array.concat(rawLevels, swingHighs)
+array.concat(rawLevels, swingLows)
+lvls = clusterLevels(rawLevels, atrVal > 0 ? 0.15 * atrVal : close * 0.0005)
 nearestRes = nearAbove(lvls, close + 0.02 * atrVal)
 nearestSup = nearBelow(lvls, close - 0.02 * atrVal)
 breakout = close > priorHigh and close[1] <= priorHigh
@@ -328,7 +380,7 @@ setRow(table t, int r, string k, string v, color c) =>
 tablePos = panelPos == "Top right" ? position.top_right : panelPos == "Bottom right" ? position.bottom_right : panelPos == "Top left" ? position.top_left : position.bottom_left
 var table panel = table.new(tablePos, 2, 18, bgcolor = color.new(#0b0e13, 5), border_color = #243042, border_width = 1)
 if showTable and barstate.islast
-    setRow(panel, 0, "CC Signal Engine", sigLabel, labelColor)
+    setRow(panel, 0, "DalalSight", sigLabel, labelColor)
     setRow(panel, 1, "Bullish / bearish", str.tostring(bullPct, "#.#") + "% / " + str.tostring(100 - bullPct, "#.#") + "%", #e3e8ef)
     setRow(panel, 2, "Model confidence", str.tostring(confidence, "#.#") + "%", #e3e8ef)
     setRow(panel, 3, "Data coverage", str.tostring(coverage * 100, "#") + "%", #e3e8ef)

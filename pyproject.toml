@@ -26,6 +26,10 @@ dev = ["pytest>=8", "pytest-subtests>=0.13", "httpx>=0.27", "ruff>=0.6", "mypy>=
 where = ["backend"]
 include = ["cc*"]
 
+[tool.setuptools.package-data]
+# bundled NSE reference snapshot, used when a fresh server cannot download the lists
+cc = ["data/reference_seed/*.csv", "data/reference_seed/manifest.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 pythonpath = ["backend"]

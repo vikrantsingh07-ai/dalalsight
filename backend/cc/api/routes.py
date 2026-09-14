@@ -414,6 +414,17 @@ def get_backtest(request: Request, job_id: int):
     return respond(row)
 
 
+@router.get("/calibration/{symbol}")
+def calibration(request: Request, symbol: str, timeframe: str = "5m"):
+    """How the engine's stated bullish % held up in the newest backtest of this symbol and timeframe."""
+    symbol, timeframe = _sym(request, symbol), _tf(timeframe)
+    result = S(request).backtests.latest_calibration(symbol, timeframe)
+    if result is None:
+        return respond({"available": False, "symbol": symbol, "timeframe": timeframe,
+                        "reason": f"no completed backtest with calibration for {symbol} {timeframe}; run one in Signals → Backtest"})
+    return respond({"available": True, "symbol": symbol, "timeframe": timeframe, **result})
+
+
 # ---------------------------------------------------------------------------- timeline, health, replay, monitor
 @router.get("/timeline")
 def timeline(request: Request, kind: str | None = Query(None, max_length=30), symbol: str | None = None,

@@ -1,0 +1,21 @@
+# systemd unit for the DalalSight backend. deploy/setup-ubuntu.sh fills in __APP_DIR__ and __USER__ and installs it
+# as /etc/systemd/system/dalalsight.service.
+[Unit]
+Description=DalalSight backend (API, WebSocket push, market monitor)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__APP_DIR__
+ExecStart=__APP_DIR__/.venv/bin/python -m cc
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
