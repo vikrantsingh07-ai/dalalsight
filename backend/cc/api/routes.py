@@ -148,8 +148,9 @@ def overview(request: Request):
             breadth = exc.to_dict()
     snapshots = {
         f"{sym}:{tf}": {"symbol": sym, "timeframe": tf, "label": snap["signal"]["label"], "bullish_pct": snap["signal"]["bullish_pct"],
-                        "model_confidence": snap["signal"]["model_confidence"], "regime": snap["regime"]["label"], "price": snap["price"],
-                        "generated_at": snap["generated_at"]}
+                        "model_confidence": snap["signal"]["model_confidence"], "direction": snap["signal"]["direction"],
+                        "regime": snap["regime"]["label"], "regime_code": snap["regime"]["code"], "regime_direction": snap["regime"]["direction"],
+                        "price": snap["price"], "generated_at": snap["generated_at"]}
         for (sym, tf), snap in list(s.analysis.latest.items())
     }
     sectors = sorted((pack(x) for x in SECTOR_INDICES), key=lambda r: -(r.get("change_pct") or -999))

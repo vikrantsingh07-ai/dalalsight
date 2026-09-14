@@ -1,10 +1,11 @@
 import { istTime, num, pct, signed } from "../lib/format";
 import type { HelpTopic } from "../lib/help";
-import { isUnavailable, type Signal, type Snapshot } from "../lib/types";
+import { strengthOf, verdictFor } from "../lib/plain";
+import { TIMEFRAME_LABELS } from "../lib/timeframes";
+import { isUnavailable, type Snapshot } from "../lib/types";
 import { TEXT_TONES, toneForNumber, type Tone } from "../lib/tones";
 import CalibrationNote from "./CalibrationNote";
 import { Help } from "./InfoTip";
-import { TIMEFRAME_LABELS } from "../lib/timeframes";
 import { Card, Meter } from "./ui";
 
 const PLAN_LABELS = new Set(["BULLISH SETUP", "BEARISH SETUP", "HIGH-RISK SETUP"]);
@@ -41,39 +42,6 @@ const CHECK_NAMES: Record<string, string> = {
   options: "options",
 };
 
-function leaningUp(signal: Signal): boolean {
-  return signal.direction ? signal.direction > 0 : signal.bullish_pct >= 50;
-}
-
-function verdict(signal: Signal): { title: string; text: string; tone: Tone; icon: string } {
-  const up = leaningUp(signal);
-  switch (signal.label) {
-    case "BULLISH SETUP":
-      return { title: "BUY setup", text: "Most checks point up. The plan below shows where it starts, where it is proven wrong, and where it may go.", tone: "bull", icon: "▲" };
-    case "BEARISH SETUP":
-      return { title: "SELL setup", text: "Most checks point down. The plan below shows where it starts, where it is proven wrong, and where it may go.", tone: "bear", icon: "▼" };
-    case "HIGH-RISK SETUP":
-      return {
-        title: `Risky ${up ? "BUY" : "SELL"} setup`,
-        text: "The direction is clear, but price is close to a big level, very jumpy, or just faked a breakout. Beginners should wait.",
-        tone: "warn",
-        icon: up ? "▲" : "▼",
-      };
-    case "LOW-QUALITY SETUP":
-      return { title: "Weak setup: better to wait", text: `Leaning ${up ? "up" : "down"}, but the possible gain is small compared with the possible loss.`, tone: "warn", icon: "◆" };
-    case "WATCH":
-      return { title: `Watch: leaning ${up ? "up" : "down"}`, text: "Some checks point this way, but not enough for a setup yet.", tone: "info", icon: up ? "↗" : "↘" };
-    default:
-      return { title: "WAIT: no clear signal", text: "The checks don't agree, or some data is missing. Not trading is also a decision.", tone: "muted", icon: "■" };
-  }
-}
-
-function strength(confidence: number): { label: string; tone: Tone } {
-  if (confidence >= 55) return { label: "Strong", tone: "bull" };
-  if (confidence >= 40) return { label: "Medium", tone: "warn" };
-  return { label: "Weak", tone: "muted" };
-}
-
 function PlanRow({ label, value, topic, tone }: { label: string; value: string; topic: HelpTopic; tone?: Tone }) {
   return (
     <div className="flex items-center justify-between gap-2 border-t border-edge/60 py-1.5 first:border-t-0">
@@ -88,8 +56,8 @@ function PlanRow({ label, value, topic, tone }: { label: string; value: string; 
 /** The beginner view of the engine's result: what it says, how sure, why, the plan and its track record. */
 export default function SignalSummary({ snap }: { snap: Snapshot }) {
   const signal = snap.signal;
-  const view = verdict(signal);
-  const power = strength(signal.model_confidence);
+  const view = verdictFor(signal.label, signal.direction, signal.bullish_pct);
+  const power = strengthOf(signal.model_confidence);
   const quote = snap.quote && !isUnavailable(snap.quote) ? snap.quote : null;
   const plan = PLAN_LABELS.has(signal.label) ? signal.plan : null;
   const checks = signal.components.filter((c) => c.available && Math.abs(c.score) >= 0.15 && PHRASES[c.name]).sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));

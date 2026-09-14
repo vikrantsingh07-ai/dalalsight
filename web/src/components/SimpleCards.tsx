@@ -1,6 +1,7 @@
 import { num, pct } from "../lib/format";
 import type { HelpTopic } from "../lib/help";
 import { useLocalState } from "../lib/hooks";
+import { MOVE_SIZE, moodOf } from "../lib/plain";
 import type { Levels, Regime } from "../lib/types";
 import { TEXT_TONES, type Tone } from "../lib/tones";
 import { Help } from "./InfoTip";
@@ -74,28 +75,11 @@ export function LevelsSimple({ levels, price }: { levels: Levels; price: number 
   );
 }
 
-const MOODS: Record<string, { title: string; text: string }> = {
-  STRONG_BULLISH_TREND: { title: "Strong uptrend", text: "Prices have been rising steadily." },
-  WEAK_BULLISH_TREND: { title: "Mild uptrend", text: "Prices are drifting up, without much force." },
-  STRONG_BEARISH_TREND: { title: "Strong downtrend", text: "Prices have been falling steadily." },
-  WEAK_BEARISH_TREND: { title: "Mild downtrend", text: "Prices are drifting down, without much force." },
-  RANGE_BOUND: { title: "Sideways", text: "Prices are moving between a floor and a ceiling. Breakouts often fail in this mood." },
-  HIGH_VOLATILITY: { title: "Very jumpy", text: "Big swings in both directions. Risk is higher than usual." },
-  LOW_VOLATILITY: { title: "Very quiet", text: "Small moves. A bigger move often follows a quiet spell." },
-  BREAKOUT: { title: "Breakout", text: "Price just left its recent range with bigger moves." },
-  TRANSITION: { title: "Changing", text: "No clear pattern yet; the direction may be turning." },
-  INSUFFICIENT_DATA: { title: "Not enough data", text: "There are too few candles to judge the mood." },
-};
-
-const MOVE_SIZE: Record<string, string> = { high: "bigger than usual", normal: "normal", low: "smaller than usual", unknown: "not known yet" };
-
 export function MoodCard({ regime }: { regime: Regime }) {
-  const mood = MOODS[regime.code] ?? { title: regime.label, text: "" };
-  const title = regime.code === "BREAKOUT" ? `Breakout ${regime.direction > 0 ? "upward" : "downward"}` : mood.title;
-  const tone: Tone = regime.direction > 0 ? "bull" : regime.direction < 0 ? "bear" : regime.code === "HIGH_VOLATILITY" ? "warn" : "info";
+  const mood = moodOf(regime.code, regime.direction);
   return (
     <Card title="Market mood" info={<Help topic="mood" />}>
-      <div className={`font-display text-lg font-semibold ${TEXT_TONES[tone]}`}>{title}</div>
+      <div className={`font-display text-lg font-semibold ${TEXT_TONES[mood.tone]}`}>{mood.title || regime.label}</div>
       <p className="mt-1 text-xs leading-relaxed text-text">{mood.text}</p>
       <p className="mt-2 text-[11px] text-muted">Size of moves: {MOVE_SIZE[regime.volatility] ?? regime.volatility}</p>
     </Card>

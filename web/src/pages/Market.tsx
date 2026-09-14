@@ -1,7 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
+import { Help } from "../components/InfoTip";
 import { useApi } from "../lib/hooks";
 import { istTime, num, pct } from "../lib/format";
+import { moodOf, plainLabel, strengthOf } from "../lib/plain";
+import { TIMEFRAME_LABELS } from "../lib/timeframes";
 import { isUnavailable, type MarketStatus, type Unavailable } from "../lib/types";
 import { TEXT_TONES, toneForLabel, toneForNumber } from "../lib/tones";
 import { Card, ErrorNote, PageHeader, Pill, Spinner, Table, UnavailableNote } from "../components/ui";
@@ -26,8 +29,23 @@ interface Breadth {
   advances: number | null;
   declines: number | null;
   unchanged: number | null;
+  basis?: string;
   timestamp: string;
   source: string;
+}
+
+interface MonitoredSignal {
+  symbol: string;
+  timeframe: string;
+  label: string;
+  bullish_pct: number;
+  model_confidence: number;
+  direction?: number;
+  regime: string;
+  regime_code?: string;
+  regime_direction?: number;
+  price: number;
+  generated_at: string;
 }
 
 interface Overview {
@@ -35,17 +53,18 @@ interface Overview {
   indices: IndexTile[];
   sectors: IndexTile[];
   breadth: Breadth | Unavailable | null;
-  snapshots: Record<string, { symbol: string; timeframe: string; label: string; bullish_pct: number; model_confidence: number; regime: string; price: number; generated_at: string }>;
+  snapshots: Record<string, MonitoredSignal>;
   generated_at: string;
 }
 
 export default function Market() {
-  const { setSymbol, status } = useApp();
+  const { setSymbol, setTimeframe, status } = useApp();
   const navigate = useNavigate();
   const overview = useApi<Overview>("/api/overview", { interval: status?.market.is_trading ? 30_000 : 300_000 });
   const data = overview.data;
-  const open = (symbol: string) => {
+  const open = (symbol: string, timeframe?: string) => {
     setSymbol(symbol);
+    if (timeframe) setTimeframe(timeframe);
     navigate("/");
   };
   const maxSector = Math.max(0.5, ...(data?.sectors ?? []).map((s) => Math.abs(s.change_pct ?? 0)));
@@ -54,8 +73,8 @@ export default function Market() {
     <div className="space-y-3">
       <PageHeader
         title="Market today"
-        subtitle={data ? `${data.market.label} · updated ${istTime(data.generated_at, { seconds: true })}` : undefined}
-        info="All major NSE and BSE indices and sectors at a glance. Green means up today, red means down. Click an index to open its signal and chart on Home."
+        subtitle={data ? `${data.market.label} · updated ${istTime(data.generated_at, { seconds: true })} · tap any card to open its chart and signal` : undefined}
+        info="All major NSE and BSE indices and sectors at a glance. Green means up today, red means down. Tap an index or sector to open its signal and chart on Home."
       >
         {overview.loading && <Spinner label="Refreshing" />}
       </PageHeader>
@@ -77,7 +96,7 @@ export default function Market() {
                       {num(tile.change)} ({pct(tile.change_pct)})
                     </div>
                     <div className="mt-1 text-[10px] text-muted">
-                      L {num(tile.low)} · H {num(tile.high)}
+                      Day range {num(tile.low)} – {num(tile.high)}
                     </div>
                   </>
                 )}
@@ -86,14 +105,14 @@ export default function Market() {
           </div>
 
           <div className="grid gap-3 xl:grid-cols-3">
-            <Card title="Market breadth (NSE)">
+            <Card title="Rising vs falling stocks (NSE)" info={<Help topic="breadth" />}>
               {!data.breadth || isUnavailable(data.breadth) ? (
                 <UnavailableNote info={isUnavailable(data.breadth) ? data.breadth : { reason: "breadth feed not available from this provider" }} />
               ) : (
                 <BreadthBar breadth={data.breadth} />
               )}
             </Card>
-            <Card title="Sector indices" className="xl:col-span-2">
+            <Card title="Sectors today (best first)" info={<Help topic="sectors" />} className="xl:col-span-2">
               <div className="grid gap-x-6 gap-y-1.5 md:grid-cols-2">
                 {data.sectors.map((sector) => (
                   <button key={sector.symbol} type="button" onClick={() => open(sector.symbol)} className="grid grid-cols-[1fr_auto] items-center gap-2 text-left text-xs hover:text-accent">
@@ -111,38 +130,42 @@ export default function Market() {
             </Card>
           </div>
 
-          <Card title="Monitored signals (market monitor)">
+          <Card title="Signals for the main indices" info={<Help topic="indexSignals" />}>
             {Object.keys(data.snapshots).length === 0 ? (
-              <div className="text-xs text-muted">The monitor has not completed a cycle yet.</div>
+              <div className="text-xs text-muted">Signals appear here after the first market check, within a minute of starting DalalSight.</div>
             ) : (
               <Table>
                 <thead>
                   <tr>
-                    <th>Symbol</th>
-                    <th>TF</th>
+                    <th>Market</th>
+                    <th>Candle size</th>
                     <th>Price</th>
                     <th>Signal</th>
-                    <th>Bullish scenario</th>
-                    <th>Model confidence</th>
-                    <th>Regime</th>
-                    <th>Computed</th>
+                    <th>Strength</th>
+                    <th>Mood</th>
+                    <th>Checked</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.values(data.snapshots).map((row) => (
-                    <tr key={`${row.symbol}${row.timeframe}`} className="cursor-pointer hover:bg-panel-2" onClick={() => open(row.symbol)}>
-                      <td className="font-mono">{row.symbol}</td>
-                      <td>{row.timeframe}</td>
-                      <td className="font-mono">{num(row.price)}</td>
-                      <td>
-                        <Pill tone={toneForLabel(row.label)}>{row.label}</Pill>
-                      </td>
-                      <td className="font-mono">{num(row.bullish_pct, 1)}%</td>
-                      <td className="font-mono">{num(row.model_confidence, 1)}%</td>
-                      <td>{row.regime}</td>
-                      <td className="text-muted">{istTime(row.generated_at, { seconds: true })}</td>
-                    </tr>
-                  ))}
+                  {Object.values(data.snapshots).map((row) => {
+                    const strength = strengthOf(row.model_confidence);
+                    const mood = moodOf(row.regime_code ?? "", row.regime_direction ?? 0);
+                    return (
+                      <tr key={`${row.symbol}${row.timeframe}`} className="cursor-pointer hover:bg-panel-2" onClick={() => open(row.symbol, row.timeframe)}>
+                        <td className="font-mono text-accent">{row.symbol}</td>
+                        <td>{TIMEFRAME_LABELS[row.timeframe] ?? row.timeframe}</td>
+                        <td className="font-mono">{num(row.price)}</td>
+                        <td>
+                          <Pill tone={toneForLabel(row.label)}>{plainLabel(row.label, row.direction ?? 0)}</Pill>
+                        </td>
+                        <td className={TEXT_TONES[strength.tone]}>
+                          {strength.label} <span className="font-mono text-muted">({num(row.model_confidence, 0)})</span>
+                        </td>
+                        <td className={TEXT_TONES[mood.tone]}>{mood.title || row.regime}</td>
+                        <td className="text-muted">{istTime(row.generated_at, { seconds: true })}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </Table>
             )}
@@ -158,8 +181,11 @@ function BreadthBar({ breadth }: { breadth: Breadth }) {
   const dec = breadth.declines ?? 0;
   const unch = breadth.unchanged ?? 0;
   const total = Math.max(1, adv + dec + unch);
+  const summary =
+    adv > dec * 1.5 ? "Most stocks are rising: a broad up day." : dec > adv * 1.5 ? "Most stocks are falling: a broad down day." : "Rising and falling stocks are roughly balanced.";
   return (
     <div>
+      <p className="mb-2 text-sm">{summary}</p>
       <div className="flex h-3 overflow-hidden rounded">
         <div className="bg-bull" style={{ width: `${(adv / total) * 100}%` }} />
         <div className="bg-edge" style={{ width: `${(unch / total) * 100}%` }} />
@@ -168,7 +194,7 @@ function BreadthBar({ breadth }: { breadth: Breadth }) {
       <div className="mt-2 grid grid-cols-3 text-center text-xs">
         <div>
           <div className="font-mono text-bull">{num(adv, 0)}</div>
-          <div className="text-muted">advances</div>
+          <div className="text-muted">rising</div>
         </div>
         <div>
           <div className="font-mono">{num(unch, 0)}</div>
@@ -176,11 +202,11 @@ function BreadthBar({ breadth }: { breadth: Breadth }) {
         </div>
         <div>
           <div className="font-mono text-bear">{num(dec, 0)}</div>
-          <div className="text-muted">declines</div>
+          <div className="text-muted">falling</div>
         </div>
       </div>
       <div className="mt-2 text-[11px] text-muted">
-        Advance/decline ratio {num(dec ? adv / dec : null, 2)} · {breadth.source} · {istTime(breadth.timestamp, { date: true })}
+        Counted among {breadth.basis ?? "NSE stocks"} · {num(dec ? adv / dec : null, 2)} rising for every falling one · {istTime(breadth.timestamp, { date: true })}
       </div>
     </div>
   );

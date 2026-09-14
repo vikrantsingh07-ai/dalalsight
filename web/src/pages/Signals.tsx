@@ -4,13 +4,27 @@ import { useApp } from "../context/AppContext";
 import { post } from "../lib/api";
 import { istTime, num, pct } from "../lib/format";
 import { useApi, useEvents, useLocalState } from "../lib/hooks";
+import { plainLabel, strengthOf } from "../lib/plain";
+import { TIMEFRAME_LABELS } from "../lib/timeframes";
 import type { BacktestRow, SignalRow } from "../lib/types";
 import CalibrationCard from "../components/CalibrationCard";
 import { LineSpark } from "../components/charts";
+import { Help } from "../components/InfoTip";
 import { TEXT_TONES, toneForLabel, toneForNumber, toneForStatus } from "../lib/tones";
 import { Button, Card, Checkbox, Empty, ErrorNote, Field, Input, Meter, PageHeader, Pill, Select, Stat, Table, Tabs } from "../components/ui";
 
 type Tab = "signals" | "paper" | "backtest";
+
+const OUTCOMES: Record<string, string> = {
+  target2: "Target 2 reached",
+  target1_then_stop: "Target 1, then stop loss",
+  stopped: "Stop loss hit",
+  expired: "Time ran out",
+  expired_after_target1: "Target 1, then time ran out",
+  not_triggered: "Never started",
+  open: "Waiting",
+  not_applicable: "—",
+};
 
 export default function Signals() {
   const [tab, setTab] = useLocalState<Tab>("cc_signals_tab", "signals");
@@ -19,13 +33,13 @@ export default function Signals() {
       <PageHeader
         title="Practice & history"
         subtitle="See past signals and how they worked out, practise with pretend trades, and test the signals on old data."
-        info="Every engine setup is recorded and checked against the candles that came after it. Paper (pretend) trades fill at real prices. Backtests replay the same engine on history without peeking at the future."
+        info="Every engine setup is recorded and checked against the candles that came after it. Practice (paper) trades fill at real prices. Tests replay the same engine on history without peeking at the future."
       >
         <Tabs
           tabs={[
-            { id: "signals", label: "Signal history" },
-            { id: "paper", label: "Paper trading" },
-            { id: "backtest", label: "Backtest" },
+            { id: "signals", label: "Past signals" },
+            { id: "paper", label: "Practice trades" },
+            { id: "backtest", label: "Test on old data" },
           ]}
           value={tab}
           onChange={setTab}
@@ -57,7 +71,8 @@ function SignalHistory() {
   return (
     <div className="space-y-3">
       <Card
-        title="Outcome statistics by label"
+        title="How past signals worked out"
+        info={<Help topic="pastSignals" />}
         actions={
           <Button
             onClick={() =>
@@ -69,32 +84,32 @@ function SignalHistory() {
                 .catch(setError)
             }
           >
-            Evaluate open signals now
+            Check open signals now
           </Button>
         }
       >
         <ErrorNote error={error ?? stats.error} />
         {stats.data && Object.keys(stats.data.by_label).length === 0 ? (
-          <Empty>No signals recorded yet. Setups are recorded by the market monitor during market hours.</Empty>
+          <Empty>No signals yet. They are saved automatically while the market is open.</Empty>
         ) : (
           <Table>
             <thead>
               <tr>
-                <th>Label</th>
-                <th>Signals</th>
-                <th>Open</th>
-                <th>Closed</th>
-                <th>Not triggered</th>
-                <th>Evaluated</th>
+                <th>Signal</th>
+                <th>Found</th>
+                <th>Still open</th>
+                <th>Finished</th>
+                <th>Never started</th>
+                <th>Checked</th>
                 <th>Win rate</th>
-                <th>Avg R</th>
+                <th>Average R</th>
               </tr>
             </thead>
             <tbody>
               {Object.entries(stats.data?.by_label ?? {}).map(([label, s]) => (
                 <tr key={label}>
                   <td>
-                    <Pill tone={toneForLabel(label)}>{label}</Pill>
+                    <Pill tone={toneForLabel(label)}>{plainLabel(label)}</Pill>
                   </td>
                   <td className="font-mono">{s.signals}</td>
                   <td className="font-mono">{s.open}</td>
@@ -108,15 +123,19 @@ function SignalHistory() {
             </tbody>
           </Table>
         )}
-        {stats.data && <p className="mt-2 text-[11px] text-muted">{stats.data.note}</p>}
+        {stats.data && (
+          <p className="mt-2 text-[11px] text-muted">
+            Each signal is checked against the candles that came after it. If one candle touched both the stop loss and a target, the stop loss is counted first (the careful choice).
+          </p>
+        )}
       </Card>
       <Card
-        title="Recorded signals"
+        title="All saved signals"
         actions={
-          <Select value={status} onChange={(event) => setStatus(event.target.value as "" | "open" | "closed")} className="w-28">
+          <Select id="signal-status" value={status} onChange={(event) => setStatus(event.target.value as "" | "open" | "closed")} className="w-32">
             <option value="">All</option>
-            <option value="open">Open</option>
-            <option value="closed">Closed</option>
+            <option value="open">Still open</option>
+            <option value="closed">Finished</option>
           </Select>
         }
         bodyClass="p-0"
@@ -131,49 +150,52 @@ function SignalHistory() {
             <thead>
               <tr>
                 <th>#</th>
-                <th>Recorded</th>
-                <th>Symbol</th>
-                <th>Label</th>
+                <th>Found at</th>
+                <th>Market</th>
+                <th>Signal</th>
                 <th>Price</th>
-                <th>Conf.</th>
-                <th>Entry</th>
-                <th>Stop</th>
-                <th>T1 / T2</th>
-                <th>R:R</th>
+                <th>Strength</th>
+                <th>Buy/sell zone</th>
+                <th>Stop loss</th>
+                <th>Target 1 / 2</th>
+                <th>Reward : risk</th>
                 <th>Status</th>
-                <th>Outcome</th>
+                <th>Result</th>
               </tr>
             </thead>
             <tbody>
-              {(signals.data ?? []).map((s) => (
-                <tr key={s.id}>
-                  <td className="font-mono text-muted">{s.id}</td>
-                  <td className="text-muted">{istTime(s.created_at, { date: true })}</td>
-                  <td className="font-mono">
-                    {s.symbol} {s.timeframe}
-                  </td>
-                  <td>
-                    <Pill tone={toneForLabel(s.label)}>{s.label}</Pill>
-                  </td>
-                  <td className="font-mono">{num(s.price)}</td>
-                  <td className="font-mono">{num(s.confidence, 0)}%</td>
-                  <td className="font-mono">
-                    {num(s.entry_low)}–{num(s.entry_high)}
-                  </td>
-                  <td className="font-mono">{num(s.stop)}</td>
-                  <td className="font-mono">
-                    {num(s.target1)} / {num(s.target2)}
-                  </td>
-                  <td className="font-mono">{num(s.rr, 2)}</td>
-                  <td>
-                    <Pill tone={s.status === "open" ? "info" : "muted"}>{s.status}</Pill>
-                  </td>
-                  <td className="font-mono">
-                    {s.outcome?.status ?? "—"}
-                    {s.outcome?.r_multiple !== undefined && <span className={TEXT_TONES[toneForNumber(s.outcome.r_multiple)]}> {num(s.outcome.r_multiple, 2)}R</span>}
-                  </td>
-                </tr>
-              ))}
+              {(signals.data ?? []).map((s) => {
+                const strength = strengthOf(s.confidence);
+                return (
+                  <tr key={s.id}>
+                    <td className="font-mono text-muted">{s.id}</td>
+                    <td className="text-muted">{istTime(s.created_at, { date: true })}</td>
+                    <td className="font-mono">
+                      {s.symbol} <span className="text-muted">{TIMEFRAME_LABELS[s.timeframe] ?? s.timeframe}</span>
+                    </td>
+                    <td>
+                      <Pill tone={toneForLabel(s.label)}>{plainLabel(s.label, s.direction)}</Pill>
+                    </td>
+                    <td className="font-mono">{num(s.price)}</td>
+                    <td className={TEXT_TONES[strength.tone]}>{strength.label}</td>
+                    <td className="font-mono">
+                      {num(s.entry_low)}–{num(s.entry_high)}
+                    </td>
+                    <td className="font-mono">{num(s.stop)}</td>
+                    <td className="font-mono">
+                      {num(s.target1)} / {num(s.target2)}
+                    </td>
+                    <td className="font-mono">1 : {num(s.rr, 1)}</td>
+                    <td>
+                      <Pill tone={s.status === "open" ? "info" : "muted"}>{s.status === "open" ? "open" : "finished"}</Pill>
+                    </td>
+                    <td>
+                      {s.outcome?.status ? (OUTCOMES[s.outcome.status] ?? s.outcome.status) : "—"}
+                      {s.outcome?.r_multiple !== undefined && <span className={`font-mono ${TEXT_TONES[toneForNumber(s.outcome.r_multiple)]}`}> {num(s.outcome.r_multiple, 2)}R</span>}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         )}
@@ -221,7 +243,7 @@ function PaperTrading() {
       const body: Record<string, unknown> = { symbol: form.symbol, side: form.side, quantity: Number(form.quantity), instrument_type: form.instrument_type, note: form.note || null };
       if (form.instrument_type === "option") Object.assign(body, { expiry: form.expiry, strike: Number(form.strike), option_type: form.option_type });
       const result = await post<{ instrument: string; price: number; price_source: string }>("/api/paper/orders", body);
-      setMessage(`PAPER fill: ${form.side} ${form.quantity} ${result.instrument} @ ${num(result.price)} (${result.price_source})`);
+      setMessage(`Practice trade saved: ${form.side} ${form.quantity} ${result.instrument} at ${num(result.price)} (${result.price_source})`);
       positions.reload();
       orders.reload();
     } catch (err) {
@@ -231,59 +253,63 @@ function PaperTrading() {
 
   return (
     <div className="space-y-3">
-      <Card title="Execution mode">
+      <Card title="Mode" info={<Help topic="practice" />}>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <Pill tone={mode === "paper" ? "accent" : mode === "live" ? "bear" : "info"}>{mode}</Pill>
+          <Pill tone={mode === "paper" ? "accent" : mode === "live" ? "bear" : "info"}>{mode === "paper" ? "Practice mode" : mode === "live" ? "Live (blocked)" : "View only"}</Pill>
           {mode === "analysis" && (
             <span>
-              Orders are refused in ANALYSIS mode. Switch to PAPER in <Link to="/settings" className="text-accent hover:underline">Settings</Link> to simulate fills at real quotes.
+              Practice trades are switched off. Turn them on in{" "}
+              <Link to="/settings" className="text-accent hover:underline">
+                Settings
+              </Link>{" "}
+              (Execution mode → Paper trading).
             </span>
           )}
-          {mode === "paper" && <span>Simulated fills only. Nothing is sent to any broker.</span>}
-          {mode === "live" && <span className="text-bear">LIVE mode is selected, but live execution is disabled and no broker adapter exists. Orders are refused.</span>}
+          {mode === "paper" && <span>Practice mode is on. Trades are pretend only; nothing is sent to any broker.</span>}
+          {mode === "live" && <span className="text-bear">Live mode is selected, but live trading is switched off and no broker is connected, so orders are refused.</span>}
         </div>
       </Card>
-      <Card title="New paper order">
+      <Card title="New practice trade" info={<Help topic="practiceTrade" />}>
         <div className="flex flex-wrap items-end gap-2">
-          <Field label="Symbol">
-            <Input value={form.symbol} onChange={(event) => setForm({ ...form, symbol: event.target.value.toUpperCase() })} className="w-32 font-mono" />
+          <Field label="Stock or index">
+            <Input id="paper-symbol" value={form.symbol} onChange={(event) => setForm({ ...form, symbol: event.target.value.toUpperCase() })} className="w-32 font-mono" />
           </Field>
-          <Field label="Side">
-            <Select value={form.side} onChange={(event) => setForm({ ...form, side: event.target.value })} className="w-24">
+          <Field label="Buy or sell">
+            <Select id="paper-side" value={form.side} onChange={(event) => setForm({ ...form, side: event.target.value })} className="w-24">
               <option>BUY</option>
               <option>SELL</option>
             </Select>
           </Field>
-          <Field label="Quantity (units)">
-            <Input type="number" min={1} value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} className="w-28" />
+          <Field label="Quantity">
+            <Input id="paper-quantity" type="number" min={1} value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} className="w-28" />
           </Field>
-          <Field label="Instrument">
-            <Select value={form.instrument_type} onChange={(event) => setForm({ ...form, instrument_type: event.target.value })} className="w-32">
-              <option value="underlying">Underlying</option>
-              <option value="option">Option</option>
+          <Field label="What">
+            <Select id="paper-instrument" value={form.instrument_type} onChange={(event) => setForm({ ...form, instrument_type: event.target.value })} className="w-36">
+              <option value="underlying">The stock / index</option>
+              <option value="option">An option</option>
             </Select>
           </Field>
           {form.instrument_type === "option" && (
             <>
               <Field label="Expiry">
-                <Input type="date" value={form.expiry} onChange={(event) => setForm({ ...form, expiry: event.target.value })} className="w-40" />
+                <Input id="paper-expiry" type="date" value={form.expiry} onChange={(event) => setForm({ ...form, expiry: event.target.value })} className="w-40" />
               </Field>
-              <Field label="Strike">
-                <Input type="number" value={form.strike} onChange={(event) => setForm({ ...form, strike: event.target.value })} className="w-28" />
+              <Field label="Strike price">
+                <Input id="paper-strike" type="number" value={form.strike} onChange={(event) => setForm({ ...form, strike: event.target.value })} className="w-28" />
               </Field>
-              <Field label="Type">
-                <Select value={form.option_type} onChange={(event) => setForm({ ...form, option_type: event.target.value })} className="w-20">
-                  <option>CE</option>
-                  <option>PE</option>
+              <Field label="Call or put">
+                <Select id="paper-option-type" value={form.option_type} onChange={(event) => setForm({ ...form, option_type: event.target.value })} className="w-28">
+                  <option value="CE">CE (call)</option>
+                  <option value="PE">PE (put)</option>
                 </Select>
               </Field>
             </>
           )}
-          <Field label="Note">
-            <Input value={form.note} maxLength={200} onChange={(event) => setForm({ ...form, note: event.target.value })} className="w-48" />
+          <Field label="Note (optional)">
+            <Input id="paper-note" value={form.note} maxLength={200} onChange={(event) => setForm({ ...form, note: event.target.value })} className="w-48" />
           </Field>
-          <Button variant="primary" onClick={() => void place()}>
-            Place paper order
+          <Button variant="primary" onClick={() => void place()} disabled={mode !== "paper"}>
+            Save practice trade
           </Button>
         </div>
         <div className="mt-2 space-y-1">
@@ -291,22 +317,22 @@ function PaperTrading() {
           {message && <div className="text-xs text-bull">{message}</div>}
         </div>
       </Card>
-      <Card title="Paper positions" bodyClass="p-0">
+      <Card title="My practice positions" bodyClass="p-0">
         {positions.data?.length === 0 ? (
           <div className="p-3">
-            <Empty>No paper positions.</Empty>
+            <Empty>No practice positions yet.</Empty>
           </div>
         ) : (
           <Table>
             <thead>
               <tr>
-                <th>Instrument</th>
-                <th>Qty</th>
-                <th>Avg</th>
-                <th>Mark</th>
-                <th>Unrealised</th>
-                <th>Realised</th>
-                <th>Mark source</th>
+                <th>What</th>
+                <th>Quantity</th>
+                <th>Average price</th>
+                <th>Price now</th>
+                <th>Open profit/loss</th>
+                <th>Booked profit/loss</th>
+                <th>Price from</th>
               </tr>
             </thead>
             <tbody>
@@ -325,17 +351,17 @@ function PaperTrading() {
           </Table>
         )}
       </Card>
-      <Card title="Paper orders" bodyClass="p-0">
+      <Card title="Practice trade log" bodyClass="p-0">
         <Table>
           <thead>
             <tr>
               <th>#</th>
               <th>Time</th>
-              <th>Side</th>
-              <th>Instrument</th>
-              <th>Qty</th>
+              <th>Buy/Sell</th>
+              <th>What</th>
+              <th>Quantity</th>
               <th>Price</th>
-              <th>Price source</th>
+              <th>Price from</th>
             </tr>
           </thead>
           <tbody>
@@ -358,6 +384,15 @@ function PaperTrading() {
 }
 
 const SETUP_LABELS = ["BULLISH SETUP", "BEARISH SETUP", "HIGH-RISK SETUP", "LOW-QUALITY SETUP"];
+const EXIT_REASONS: Record<string, string> = {
+  stop: "Stop loss",
+  "stop (gap)": "Stop loss (price jumped past it)",
+  target: "Target",
+  "target (gap)": "Target (price jumped past it)",
+  "time exit": "Held too long",
+  "session square-off": "Closed at day end",
+  "end of data": "Test data ended",
+};
 
 function Backtests() {
   const [params, setParams] = useLocalState("cc_backtest_params", {
@@ -404,75 +439,87 @@ function Backtests() {
   const summary = detail.data?.summary;
   return (
     <div className="space-y-3">
-      <Card title="Backtest parameters">
+      <Card title="Test the signals on old data" info={<Help topic="backtest" />}>
         <div className="flex flex-wrap items-end gap-2">
-          <Field label="Symbol">
-            <Input value={params.symbol} onChange={(event) => setParams({ ...params, symbol: event.target.value.toUpperCase() })} className="w-28 font-mono" />
+          <Field label="Stock or index">
+            <Input id="backtest-symbol" value={params.symbol} onChange={(event) => setParams({ ...params, symbol: event.target.value.toUpperCase() })} className="w-32 font-mono" />
           </Field>
-          <Field label="Timeframe">
-            <Select value={params.timeframe} onChange={(event) => setParams({ ...params, timeframe: event.target.value })} className="w-24">
+          <Field label="Candle size">
+            <Select id="backtest-timeframe" value={params.timeframe} onChange={(event) => setParams({ ...params, timeframe: event.target.value })} className="w-28">
               {["5m", "15m", "30m", "1h", "4h", "1D"].map((tf) => (
-                <option key={tf}>{tf}</option>
+                <option key={tf} value={tf}>
+                  {TIMEFRAME_LABELS[tf]}
+                </option>
               ))}
             </Select>
           </Field>
-          {(
-            [
-              ["bars", "Bars", 200, 3000, 1],
-              ["window", "Window", 120, 600, 1],
-              ["warmup", "Warm-up", 60, 500, 1],
-              ["max_hold_bars", "Max hold", 1, 300, 1],
-              ["slippage_bps", "Slippage bps", 0, 100, 0.5],
-              ["cost_pct_per_side", "Cost %/side", 0, 1, 0.01],
-              ["entry_window_bars", "Entry window (bars)", 1, 50, 1],
-            ] as const
-          ).map(([key, label, min, max, step]) => (
-            <Field key={key} label={label}>
-              <Input type="number" min={min} max={max} step={step} value={params[key]} onChange={(event) => setParams({ ...params, [key]: Number(event.target.value) })} className="w-24" />
-            </Field>
-          ))}
-          <Field label="Exit target">
-            <Select value={params.target} onChange={(event) => setParams({ ...params, target: event.target.value })} className="w-20">
-              <option>T1</option>
-              <option>T2</option>
-            </Select>
-          </Field>
           <Button variant="primary" onClick={() => void run()}>
-            Run backtest
+            Run test
           </Button>
         </div>
-        <div className="mt-2 flex flex-wrap gap-3">
-          {SETUP_LABELS.map((label) => (
-            <Checkbox
-              key={label}
-              label={label}
-              checked={params.labels.includes(label)}
-              onChange={(checked) => setParams({ ...params, labels: checked ? [...params.labels, label] : params.labels.filter((l) => l !== label) })}
-            />
-          ))}
-          <Checkbox label="Square off intraday at session end" checked={params.square_off_intraday} onChange={(checked) => setParams({ ...params, square_off_intraday: checked })} />
-        </div>
-        <p className="mt-2 text-[11px] text-muted">Public intraday history is limited (Yahoo: 5m/15m ≈ 60 days, 1h ≈ 2 years); requested bars are capped by what the provider returns.</p>
+        <p className="mt-2 text-[11px] text-muted">Free data only goes back so far: about 60 days for 5 and 15 min candles, and about 2 years for 1 hour candles.</p>
+        <details className="group mt-2 rounded border border-edge">
+          <summary className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-muted hover:text-text">
+            <span className="transition group-open:rotate-90">▸</span> More test settings
+          </summary>
+          <div className="border-t border-edge p-2.5">
+            <div className="flex flex-wrap items-end gap-2">
+              {(
+                [
+                  ["bars", "Candles to load", 200, 3000, 1],
+                  ["window", "Candles per check", 120, 600, 1],
+                  ["warmup", "Warm-up candles", 60, 500, 1],
+                  ["max_hold_bars", "Max candles held", 1, 300, 1],
+                  ["slippage_bps", "Slippage (bps)", 0, 100, 0.5],
+                  ["cost_pct_per_side", "Cost % per side", 0, 1, 0.01],
+                  ["entry_window_bars", "Candles to get filled", 1, 50, 1],
+                ] as const
+              ).map(([key, label, min, max, step]) => (
+                <Field key={key} label={label}>
+                  <Input id={`backtest-${key}`} type="number" min={min} max={max} step={step} value={params[key]} onChange={(event) => setParams({ ...params, [key]: Number(event.target.value) })} className="w-28" />
+                </Field>
+              ))}
+              <Field label="Exit at">
+                <Select id="backtest-target" value={params.target} onChange={(event) => setParams({ ...params, target: event.target.value })} className="w-28">
+                  <option value="T1">Target 1</option>
+                  <option value="T2">Target 2</option>
+                </Select>
+              </Field>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <span className="text-xs text-muted">Trade these signals:</span>
+              {SETUP_LABELS.map((label) => (
+                <Checkbox
+                  key={label}
+                  label={plainLabel(label)}
+                  checked={params.labels.includes(label)}
+                  onChange={(checked) => setParams({ ...params, labels: checked ? [...params.labels, label] : params.labels.filter((l) => l !== label) })}
+                />
+              ))}
+              <Checkbox label="Close intraday trades at day end" checked={params.square_off_intraday} onChange={(checked) => setParams({ ...params, square_off_intraday: checked })} />
+            </div>
+          </div>
+        </details>
         <ErrorNote error={error} />
       </Card>
 
       <div className="grid gap-3 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <Card title="Runs" bodyClass="max-h-[600px] overflow-y-auto p-2">
-          {list.data?.length === 0 && <Empty>No backtests yet.</Empty>}
+        <Card title="Tests" bodyClass="max-h-[600px] overflow-y-auto p-2">
+          {list.data?.length === 0 && <Empty>No tests yet.</Empty>}
           <ul className="space-y-1">
             {(list.data ?? []).map((row) => (
               <li key={row.id}>
                 <button type="button" onClick={() => setSelected(row.id)} className={`w-full rounded px-2 py-1.5 text-left text-xs ${row.id === selectedId ? "bg-panel-2" : "hover:bg-panel-2/60"}`}>
                   <div className="flex items-center justify-between">
                     <span>
-                      <span className="font-mono">#{row.id}</span> {String(row.params.symbol)} {String(row.params.timeframe)}
+                      <span className="font-mono">#{row.id}</span> {String(row.params.symbol)} · {TIMEFRAME_LABELS[String(row.params.timeframe)] ?? String(row.params.timeframe)}
                     </span>
                     <Pill tone={toneForStatus(row.status)}>{row.status}</Pill>
                   </div>
                   {row.status === "running" && <Meter value={progress[row.id] ?? 0} />}
                   {row.summary && (
                     <div className="mt-0.5 text-muted">
-                      {row.summary.trades} trades · win {row.summary.win_rate ?? "—"}% · {num(row.summary.expectancy_r, 2)}R
+                      {row.summary.trades} trades · {row.summary.win_rate ?? "—"}% won · {num(row.summary.expectancy_r, 2)}R each
                     </div>
                   )}
                 </button>
@@ -484,64 +531,70 @@ function Backtests() {
           <ErrorNote error={detail.data?.error ?? detail.error} />
           {summary && (
             <>
+              <div className="flex items-center gap-1.5 text-xs text-muted">
+                What these numbers mean <Help topic="results" />
+              </div>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
                 <Stat label="Trades" value={summary.trades} />
-                <Stat label="Win rate" value={summary.win_rate === null ? "—" : `${num(summary.win_rate, 1)}%`} />
-                <Stat label="Expectancy" value={`${num(summary.expectancy_r, 3)}R`} tone={toneForNumber(summary.expectancy_r)} />
-                <Stat label="Total" value={`${num(summary.total_r, 2)}R`} tone={toneForNumber(summary.total_r)} />
+                <Stat label="Won" value={summary.win_rate === null ? "—" : `${num(summary.win_rate, 1)}%`} />
+                <Stat label="Average result" value={`${num(summary.expectancy_r, 2)}R`} tone={toneForNumber(summary.expectancy_r)} />
+                <Stat label="Total result" value={`${num(summary.total_r, 2)}R`} tone={toneForNumber(summary.total_r)} />
                 <Stat label="Profit factor" value={num(summary.profit_factor, 2)} />
-                <Stat label="Max drawdown" value={`${num(summary.max_drawdown_r, 2)}R`} tone="bear" />
-                <Stat label="Avg bars held" value={num(summary.avg_bars_held, 1)} />
-                <Stat label="Unfilled / gapped" value={`${summary.entries_not_filled ?? 0} / ${summary.skipped_gap_entries}`} />
+                <Stat label="Worst drop" value={`${num(summary.max_drawdown_r, 2)}R`} tone="bear" />
+                <Stat label="Avg candles held" value={num(summary.avg_bars_held, 1)} />
+                <Stat label="Missed / jumped" value={`${summary.entries_not_filled ?? 0} / ${summary.skipped_gap_entries}`} />
               </div>
-              <Card title={`Equity curve (R) · ${summary.symbol} ${summary.timeframe} · ${istTime(summary.period.start, { date: true })} → ${istTime(summary.period.end, { date: true })}`}>
+              <Card title={`Result over time (R) · ${summary.symbol} ${TIMEFRAME_LABELS[summary.timeframe] ?? summary.timeframe} · ${istTime(summary.period.start, { date: true })} → ${istTime(summary.period.end, { date: true })}`}>
                 {summary.equity_curve_r && summary.equity_curve_r.length > 1 ? <LineSpark values={summary.equity_curve_r} label="Cumulative R" /> : <Empty>No trades.</Empty>}
                 <div className="mt-2 grid gap-3 text-[11px] md:grid-cols-3">
                   <div>
-                    <div className="uppercase tracking-wide text-muted">Exit reasons</div>
+                    <div className="uppercase tracking-wide text-muted">Why trades ended</div>
                     {Object.entries(summary.exit_reasons).map(([reason, count]) => (
                       <div key={reason}>
-                        {reason}: <span className="font-mono">{count}</span>
+                        {EXIT_REASONS[reason] ?? reason}: <span className="font-mono">{count}</span>
                       </div>
                     ))}
                   </div>
                   <div>
-                    <div className="uppercase tracking-wide text-muted">By label</div>
+                    <div className="uppercase tracking-wide text-muted">By signal</div>
                     {Object.entries(summary.by_label).map(([label, s]) => (
                       <div key={label}>
-                        {label}: {s.trades} · {num(s.win_rate, 0)}% · {num(s.avg_r, 2)}R
+                        {plainLabel(label)}: {s.trades} trades · {num(s.win_rate, 0)}% won · {num(s.avg_r, 2)}R
                       </div>
                     ))}
                   </div>
                   <div>
-                    <div className="uppercase tracking-wide text-muted">Signal labels seen</div>
+                    <div className="uppercase tracking-wide text-muted">Signal on each candle</div>
                     {Object.entries(summary.signal_label_counts).map(([label, count]) => (
                       <div key={label}>
-                        {label}: <span className="font-mono">{count}</span>
+                        {plainLabel(label)}: <span className="font-mono">{count}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-                <ul className="mt-2 space-y-0.5 text-[11px] text-muted">
-                  {summary.assumptions.map((a) => (
-                    <li key={a}>· {a}</li>
-                  ))}
-                  {summary.data_source && <li>· data: {summary.data_source}</li>}
-                </ul>
+                <details className="mt-2 text-[11px] text-muted">
+                  <summary className="hover:text-text">How the test works ▾</summary>
+                  <ul className="mt-1 space-y-0.5">
+                    {summary.assumptions.map((a) => (
+                      <li key={a}>· {a}</li>
+                    ))}
+                    {summary.data_source && <li>· data: {summary.data_source}</li>}
+                  </ul>
+                </details>
               </Card>
               {summary.calibration && <CalibrationCard calibration={summary.calibration} />}
-              <Card title="Trades" bodyClass="max-h-[420px] overflow-auto p-0">
+              <Card title="Test trades" bodyClass="max-h-[420px] overflow-auto p-0">
                 <Table>
                   <thead>
                     <tr>
-                      <th>Entry</th>
-                      <th>Exit</th>
-                      <th>Label</th>
-                      <th>Entry px</th>
-                      <th>Exit px</th>
-                      <th>Reason</th>
-                      <th>Bars</th>
-                      <th>R</th>
+                      <th>Entered</th>
+                      <th>Exited</th>
+                      <th>Side</th>
+                      <th>Entry price</th>
+                      <th>Exit price</th>
+                      <th>Why it ended</th>
+                      <th>Candles</th>
+                      <th>Result (R)</th>
                       <th>P&amp;L %</th>
                     </tr>
                   </thead>
@@ -551,11 +604,11 @@ function Backtests() {
                         <td className="text-muted">{istTime(t.entry_time, { date: true })}</td>
                         <td className="text-muted">{istTime(t.exit_time, { date: true })}</td>
                         <td>
-                          <Pill tone={toneForLabel(t.label)}>{t.direction > 0 ? "long" : "short"}</Pill>
+                          <Pill tone={toneForLabel(t.label)}>{t.direction > 0 ? "BUY" : "SELL"}</Pill>
                         </td>
                         <td className="font-mono">{num(t.entry)}</td>
                         <td className="font-mono">{num(t.exit)}</td>
-                        <td>{t.reason}</td>
+                        <td>{EXIT_REASONS[t.reason] ?? t.reason}</td>
                         <td className="font-mono">{t.bars_held}</td>
                         <td className={`font-mono ${TEXT_TONES[toneForNumber(t.r_multiple)]}`}>{num(t.r_multiple, 2)}</td>
                         <td className={`font-mono ${TEXT_TONES[toneForNumber(t.pnl_pct)]}`}>{pct(t.pnl_pct)}</td>

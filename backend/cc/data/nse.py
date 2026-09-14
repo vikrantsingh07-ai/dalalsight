@@ -89,9 +89,13 @@ class NSEPublicProvider(MarketDataProvider):
         def load() -> dict:
             payload = self._json("allIndices")
             rows = {row.get("index"): row for row in payload.get("data", []) if isinstance(row, dict)}
+            # NSE's top-level advances/declines add up every index row, so a stock in many indices counts many times.
+            # The NIFTY 500 row counts each of the 500 largest companies once.
+            broad = rows.get("NIFTY 500")
+            source, basis = (broad, "NIFTY 500 stocks") if broad else (payload, "all NSE indices added together (a stock can count more than once)")
             return {"rows": rows, "timestamp": _nse_datetime(payload["timestamp"]), "breadth": {
-                "advances": _num(payload.get("advances")), "declines": _num(payload.get("declines")),
-                "unchanged": _num(payload.get("unchanged")),
+                "advances": _num(source.get("advances")), "declines": _num(source.get("declines")),
+                "unchanged": _num(source.get("unchanged")), "basis": basis,
             }}
 
         return self.cache.get_or_set(("nse_all_indices",), 10, load)

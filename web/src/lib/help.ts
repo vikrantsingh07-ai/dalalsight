@@ -76,6 +76,62 @@ export const HELP = {
     title: "Advanced details",
     body: "The raw numbers behind the simple view: every check's score, all price levels, indicator values and options data. Useful once you are comfortable with the basics.",
   },
+  breadth: {
+    title: "Rising vs falling stocks",
+    body: "How many of the NIFTY 500 companies (the 500 biggest on NSE) rose, fell or stayed flat today, each counted once. When most rise together, the up-move is broad and healthier; when only a few rise, the index may be carried by a handful of big names.",
+  },
+  sectors: {
+    title: "Sectors",
+    body: "Groups of companies from the same industry, such as IT, banks or pharma. Seeing which sectors lead or lag shows where money is flowing today.",
+  },
+  indexSignals: {
+    title: "Signals for the main indices",
+    body: "While the market is open, DalalSight checks the main indices every 30 seconds with the same signal as Home. Tap a row to open that market's chart.",
+  },
+  healthScore: {
+    title: "Stock health score",
+    body: "A 0–100 score from simple checks on the price trend, strength against NIFTY, trading activity and company numbers. Above 55 looks healthy, below 45 looks weak. It is a starting point for research, not a buy or sell call.",
+  },
+  fundamentals: {
+    title: "Company numbers",
+    body: "Numbers from the company's financial reports. P/E compares the share price with yearly profit per share (lower can mean cheaper). Return on equity shows how much profit the company makes on its owners' money. Debt/equity compares borrowing with owners' money (lower is safer).",
+  },
+  performance: {
+    title: "Recent performance",
+    body: "How the price behaved recently. 'vs NIFTY' shows whether the stock did better (+) or worse (−) than the index. RSI above 70 means the price rose fast and may be stretched; below 30 means it fell fast. Trend strength (ADX) above 25 means a strong trend. Beta above 1 means it usually moves more than NIFTY.",
+  },
+  scanner: {
+    title: "Find stocks",
+    body: "Checks a whole list of stocks at once and shows the ones that match what you are looking for, ranked by the health score. Click any stock to see its details.",
+  },
+  alertCondition: {
+    title: "When to alert",
+    body: "What has to happen before DalalSight tells you, for example the price going above a level you choose, or a BUY or SELL setup appearing.",
+  },
+  alertChannels: {
+    title: "How to tell you",
+    body: "'On this page' and sound work straight away. Browser pop-ups need your permission (button at the top). Telegram, email and webhook need extra setup on the server.",
+  },
+  alertRepeat: {
+    title: "Wait before repeating",
+    body: "After an alert fires, DalalSight waits this long before sending the same alert again, so you aren't flooded.",
+  },
+  pastSignals: {
+    title: "Past signals",
+    body: "Every BUY or SELL setup found while the market was open is saved, then checked against what price did next. Win rate is the share of finished signals that made money. R is the result in units of the planned risk: +2R means twice the risk was gained, −1R means the stop loss was hit.",
+  },
+  practiceTrade: {
+    title: "Practice trade",
+    body: "Record a pretend buy or sell at the real current price. Nothing is sent to any broker. Use it to practise and see how your ideas would have worked out.",
+  },
+  backtest: {
+    title: "Test on old data",
+    body: "Replays the signal on old prices, candle by candle, without peeking at the future, and shows how its trades would have turned out. Good past results don't guarantee future results.",
+  },
+  results: {
+    title: "Reading test results",
+    body: "Win rate: share of test trades that made money. R: result in units of the planned risk (+1R gained what was risked, −1R lost it). Profit factor: total gains ÷ total losses (above 1 made money). Worst drop: the biggest fall from a high point, in R.",
+  },
 } satisfies Record<string, { title: string; body: string }>;
 
 export type HelpTopic = keyof typeof HELP;

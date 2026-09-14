@@ -1,4 +1,5 @@
 import { num } from "../lib/format";
+import { plainLabel } from "../lib/plain";
 import type { Calibration, CalibrationBucket } from "../lib/types";
 import { TEXT_TONES, toneForLabel, toneForNumber, type Tone } from "../lib/tones";
 import { Card, Empty, Pill, Table } from "./ui";
@@ -79,7 +80,7 @@ export default function CalibrationCard({ calibration }: { calibration: Calibrat
                 {c.by_label.map((b) => (
                   <tr key={b.bucket}>
                     <td>
-                      <Pill tone={toneForLabel(b.bucket)}>{b.bucket}</Pill>
+                      <Pill tone={toneForLabel(b.bucket)}>{plainLabel(b.bucket)}</Pill>
                     </td>
                     <td className="font-mono">{b.samples}</td>
                     <td className="font-mono">{b.directional_samples ? percent(b.hit_pct) : "no direction"}</td>
