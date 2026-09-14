@@ -50,6 +50,9 @@ export function setToken(token: string): void {
   }
 }
 
+/** Backend origin when the dashboard is hosted apart from the API (e.g. on Vercel); empty means same origin. */
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
+
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, ...rest } = init;
   const headers = new Headers(rest.headers);
@@ -60,7 +63,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     headers.set("Content-Type", "application/json");
     body = JSON.stringify(json);
   }
-  const response = await fetch(path, { ...rest, headers, body });
+  const response = await fetch(`${API_BASE}${path}`, { ...rest, headers, body });
   const text = await response.text();
   let data: unknown = null;
   try {

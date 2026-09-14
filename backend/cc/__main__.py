@@ -6,12 +6,15 @@ import logging
 
 import uvicorn
 
-from .config import EnvConfig, load_environment
+from .config import LOOPBACK_HOSTS, EnvConfig, load_environment
 
 
 def main() -> None:
     load_environment()
     env = EnvConfig.from_env()
+    if env.host not in LOOPBACK_HOSTS and not env.access_token:
+        # Without a token, anyone who can reach the host could change settings, place paper orders and spend the AI budget.
+        raise SystemExit(f"Refusing to listen on {env.host}: set CC_ACCESS_TOKEN to a long random string first.")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     from .api.app import create_app
 

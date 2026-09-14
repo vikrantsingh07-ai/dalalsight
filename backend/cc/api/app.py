@@ -71,10 +71,6 @@ def create_app(env: EnvConfig | None = None, services: Services | None = None, s
                   openapi_url="/api/openapi.json")
     app.state.services = services
 
-    if env.dev_mode:
-        app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-                           allow_methods=["*"], allow_headers=["*"])
-
     @app.middleware("http")
     async def guard(request: Request, call_next):
         path = request.url.path
@@ -88,6 +84,12 @@ def create_app(env: EnvConfig | None = None, services: Services | None = None, s
         if path.startswith("/api"):
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    # Added after the guard so CORS is the outermost layer: preflights are answered before the token check and
+    # 401 responses still carry CORS headers, so a dashboard hosted elsewhere (e.g. Vercel) can prompt for the token.
+    origins = [*(("http://localhost:5173", "http://127.0.0.1:5173") if env.dev_mode else ()), *env.cors_origins]
+    if origins:
+        app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"])
 
     @app.exception_handler(DataUnavailable)
     async def _unavailable(_: Request, exc: DataUnavailable):

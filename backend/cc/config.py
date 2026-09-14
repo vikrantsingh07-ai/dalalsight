@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+TRADINGAGENTS_DIR = PROJECT_ROOT / "packages" / "tradingagents"  # TradingAgents India, vendored in this repo
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
 
 Priority = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 PRIORITY_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
@@ -25,12 +27,12 @@ TIMEFRAME_MINUTES = {"1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30, "1h": 60, 
 
 
 def load_environment() -> None:
-    """Load ``command_center/.env`` and then ``TradingAgents/.env`` (shared provider keys).
+    """Load the repo-root ``.env`` and then ``packages/tradingagents/.env`` if one exists.
 
     Variables already present in the process environment always win.
     """
     load_dotenv(PROJECT_ROOT / ".env", override=False)
-    ta_dir = Path(os.environ.get("TRADINGAGENTS_DIR") or PROJECT_ROOT.parent / "TradingAgents")
+    ta_dir = Path(os.environ.get("TRADINGAGENTS_DIR") or TRADINGAGENTS_DIR)
     load_dotenv(ta_dir / ".env", override=False)
 
 
@@ -83,6 +85,8 @@ class EnvConfig:
     smtp_password: str
     alert_email_from: str
     alert_email_to: str
+    # Origins allowed to call the API cross-origin, e.g. the dashboard deployed on Vercel.
+    cors_origins: tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls) -> EnvConfig:
@@ -94,9 +98,10 @@ class EnvConfig:
             raise ValueError(f"EXECUTION_MODE must be analysis, paper or live, got {execution_mode!r}")
         return cls(
             host=_env("CC_HOST", "127.0.0.1"),
-            port=_env_int("CC_PORT", 8765),
+            port=_env_int("CC_PORT", _env_int("PORT", 8765)),  # hosting platforms set PORT
             db_path=db_path,
             dev_mode=_env_bool("CC_DEV_MODE", True),
+            cors_origins=tuple(origin.strip().rstrip("/") for origin in _env("CC_CORS_ORIGINS").split(",") if origin.strip()),
             access_token=_env("CC_ACCESS_TOKEN"),
             ai_provider=_env("AI_PROVIDER", "openrouter").lower(),
             ai_base_url=_env("AI_BASE_URL", "https://openrouter.ai/api/v1"),

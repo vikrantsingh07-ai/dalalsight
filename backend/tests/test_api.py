@@ -207,3 +207,37 @@ def test_tradingview_pine_script_is_served(client):
     response = client.get("/api/tradingview/pine")
     assert response.status_code == 200 and response.text.startswith("//@version=6")
     assert 'indicator("Command Center Signal Engine"' in response.text and "alertcondition(" in response.text
+
+
+def test_cors_lets_a_separately_hosted_dashboard_use_the_token(registry, provider):
+    origin = "https://cc-dashboard.vercel.app"
+    services = build_services(make_env(access_token="tok-123", cors_origins=(origin,)), db=Database(":memory:"),
+                              provider=provider, registry=registry, adapter_factory=FakeAdapter)
+    with TestClient(create_app(services=services, start_background=False)) as c:
+        preflight = c.options("/api/status", headers={"Origin": origin, "Access-Control-Request-Method": "GET",
+                                                      "Access-Control-Request-Headers": "x-access-token"})
+        assert preflight.status_code == 200 and preflight.headers["access-control-allow-origin"] == origin
+        refused = c.get("/api/status", headers={"Origin": origin})
+        assert refused.status_code == 401 and refused.headers["access-control-allow-origin"] == origin
+        allowed = c.get("/api/status", headers={"Origin": origin, "X-Access-Token": "tok-123"})
+        assert allowed.status_code == 200 and allowed.headers["access-control-allow-origin"] == origin
+        assert "access-control-allow-origin" not in c.get("/api/status", headers={"Origin": "https://evil.example"}).headers
+
+
+def test_server_refuses_public_bind_without_token(monkeypatch):
+    import cc.__main__ as entry
+
+    started: list[dict] = []
+    monkeypatch.setattr(entry, "load_environment", lambda: None)
+    monkeypatch.setattr("cc.api.app.create_app", lambda env: object())
+    monkeypatch.setattr(entry.uvicorn, "run", lambda app, **kwargs: started.append(kwargs))
+    monkeypatch.setenv("CC_HOST", "0.0.0.0")
+    monkeypatch.delenv("CC_ACCESS_TOKEN", raising=False)
+    with pytest.raises(SystemExit, match="CC_ACCESS_TOKEN"):
+        entry.main()
+    assert not started
+    monkeypatch.setenv("CC_ACCESS_TOKEN", "a-long-random-token")
+    monkeypatch.delenv("CC_PORT", raising=False)
+    monkeypatch.setenv("PORT", "10000")
+    entry.main()
+    assert started[0]["host"] == "0.0.0.0" and started[0]["port"] == 10000

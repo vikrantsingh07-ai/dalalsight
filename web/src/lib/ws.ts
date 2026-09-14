@@ -1,4 +1,4 @@
-import { getToken } from "./api";
+import { API_BASE, getToken } from "./api";
 
 export interface WsMessage {
   type: string;
@@ -18,6 +18,14 @@ function tokenProtocol(token: string): string {
   return `cc-token.${btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
 }
 
+/** Same origin by default; a dashboard hosted apart from the API (e.g. on Vercel) connects to the API host. */
+function socketUrl(): string {
+  const explicit = (import.meta.env.VITE_WS_URL ?? "").trim();
+  if (explicit) return explicit;
+  if (API_BASE) return `${API_BASE.replace(/^http/, "ws")}/ws`;
+  return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
+}
+
 class DashboardSocket {
   private socket: WebSocket | null = null;
   private handlers = new Set<Handler>();
@@ -29,11 +37,11 @@ class DashboardSocket {
 
   connect(): void {
     if (this.socket && this.socket.readyState <= WebSocket.OPEN) return;
-    const protocol = location.protocol === "https:" ? "wss" : "ws";
+    const url = socketUrl();
     const token = getToken();
     this.setState("connecting");
     // The access token is sent as a subprotocol, never in the URL.
-    const socket = token ? new WebSocket(`${protocol}://${location.host}/ws`, [tokenProtocol(token)]) : new WebSocket(`${protocol}://${location.host}/ws`);
+    const socket = token ? new WebSocket(url, [tokenProtocol(token)]) : new WebSocket(url);
     this.socket = socket;
     socket.onopen = () => {
       this.retries = 0;
