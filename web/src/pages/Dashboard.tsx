@@ -1,13 +1,15 @@
+import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useApi, useEvents } from "../lib/hooks";
 import type { Snapshot } from "../lib/types";
 import { EventsCard, LevelsCard, OptionsSnapshotCard, RegimeCard, SignalPanel, TechnicalCard } from "../components/analysis";
 import CommentaryFeed from "../components/CommentaryFeed";
 import { Help } from "../components/InfoTip";
-import LiveChart from "../components/LiveChart";
 import { SymbolPicker } from "../components/pickers";
 import SignalSummary from "../components/SignalSummary";
 import { LevelsSimple, MoodCard, WelcomeGuide } from "../components/SimpleCards";
+import TradingChart from "../components/TradingChart";
+import TradingViewPanel from "../components/TradingViewPanel";
 import { Button, Card, ErrorNote, Select, Spinner } from "../components/ui";
 
 const MAIN_TIMEFRAMES: [string, string][] = [
@@ -27,6 +29,7 @@ const PLAN_LABELS = new Set(["BULLISH SETUP", "BEARISH SETUP", "HIGH-RISK SETUP"
 
 export default function Dashboard() {
   const { symbol, timeframe, setTimeframe, status } = useApp();
+  const [tradingViewOpen, setTradingViewOpen] = useState(false);
   const ready = Boolean(symbol && timeframe);
   const trading = Boolean(status?.market.is_trading);
   const analysis = useApi<Snapshot>(ready ? `/api/analysis/${symbol}?timeframe=${timeframe}` : null, { interval: trading ? 30_000 : 300_000 });
@@ -42,8 +45,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-3">
-      <WelcomeGuide />
-
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-edge bg-panel px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className="flex items-center gap-1.5 text-xs font-medium text-muted">
@@ -85,19 +86,19 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {symbol &&
+        timeframe &&
+        (tradingViewOpen ? (
+          <TradingViewPanel symbol={symbol} timeframe={timeframe} onClose={() => setTradingViewOpen(false)} />
+        ) : (
+          <TradingChart symbol={symbol} timeframe={timeframe} plan={plan} levels={snap?.levels ?? null} isTrading={trading} onOpenTradingView={() => setTradingViewOpen(true)} />
+        ))}
+
+      <WelcomeGuide />
       <ErrorNote error={analysis.error} />
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="order-2 min-w-0 space-y-3 xl:order-1">
-          {symbol && timeframe && <LiveChart symbol={symbol} timeframe={timeframe} plan={plan} levels={snap?.levels ?? null} isTrading={trading} />}
-          {snap && (
-            <div className="grid gap-3 md:grid-cols-2">
-              <LevelsSimple levels={snap.levels} price={snap.price} />
-              <MoodCard regime={snap.regime} />
-            </div>
-          )}
-        </div>
-        <div className="order-1 min-w-0 space-y-3 xl:order-2">
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="min-w-0">
           {snap ? (
             <SignalSummary snap={snap} />
           ) : (
@@ -107,8 +108,13 @@ export default function Dashboard() {
               </Card>
             )
           )}
-          <CommentaryFeed symbol={symbol} limit={10} title="Latest updates" info={<Help topic="updates" align="right" />} />
         </div>
+        {snap && (
+          <div className="min-w-0 space-y-3">
+            <LevelsSimple levels={snap.levels} price={snap.price} />
+            <MoodCard regime={snap.regime} />
+          </div>
+        )}
       </div>
 
       {snap && (
@@ -130,6 +136,8 @@ export default function Dashboard() {
           </div>
         </details>
       )}
+
+      <CommentaryFeed symbol={symbol} limit={10} title="Latest updates" info={<Help topic="updates" align="right" />} />
     </div>
   );
 }

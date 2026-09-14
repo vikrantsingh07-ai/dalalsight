@@ -45,8 +45,16 @@ export const HELP = {
     body: "How much time each candle on the chart covers. 5 min shows quick moves inside the day; 1 day shows the bigger picture. The signal is worked out separately for each candle size, so it can differ.",
   },
   chart: {
-    title: "Reading the chart",
-    body: "Each candle is one period: green closed higher than it opened, red closed lower. Green ▲ BUY and red ▼ SELL arrows mark where the signal turned on a finished candle; amber arrows are risky setups. Dotted lines are the price floor and ceiling; solid lines are the current plan (zone, stop loss, targets).",
+    title: "Using the chart",
+    body: "It works like the TradingView app. Top bar: Spot or Futures candles, candle size, chart type (Candles, Heikin Ashi, Bars, Line, Area) and Indicators (EMAs, VWAP, Bollinger Bands, Supertrend, RSI and MACD panes). Left bar: draw trend lines (two clicks) and horizontal lines (one click); drawings are saved for this chart. Scroll to zoom, drag to move. Green ▲ BUY and red ▼ SELL arrows mark where the signal turned on a finished candle (yellow = risky). The % on an arrow is how often similar readings went that way first in a past test. Hover a candle to read it. Dotted lines: price floor and ceiling. Solid lines: the current plan. The TradingView button opens the real TradingView chart.",
+  },
+  chartViews: {
+    title: "The real TradingView chart",
+    body: "The TradingView button opens TradingView's own chart with its tools and indicators. Outside its website TradingView only allows BSE markets (SENSEX, BANKEX and BSE stock prices) on daily or weekly candles, blocks NSE markets such as NIFTY, and doesn't let other apps draw BUY/SELL arrows or % on it. The main DalalSight chart shows every market and candle size with arrows and %.",
+  },
+  probability: {
+    title: "Worked before % and model score %",
+    body: "Worked before: DalalSight replayed this market and candle size on old prices. Out of past readings like this one, this is how often price moved one normal step (1 ATR) the signal's way before moving one step against it. It is a real count from the past, not a promise; around 50% is a coin flip. It shows only when there were at least 30 past cases. Model score: how bullish or bearish the 8 checks look right now. It is not a win chance, because past tests showed high scores did not win more often.",
   },
   mood: {
     title: "Market mood",

@@ -159,9 +159,15 @@ def overview(request: Request):
 
 
 @router.get("/chart/{symbol}")
-def chart(request: Request, symbol: str, timeframe: str = "5m", bars: int = Query(500, ge=50, le=2000)):
+def chart(request: Request, symbol: str, timeframe: str = "5m", bars: int = Query(500, ge=50, le=2000),
+          feed: Literal["spot", "futures"] = "spot"):
     _limit(request, "chart", 240, 60)
-    return respond(S(request).analysis.chart(_sym(request, symbol), _tf(timeframe), bars))
+    symbol, timeframe = _sym(request, symbol), _tf(timeframe)
+    if feed == "futures":
+        # Never substitute spot candles for futures: until the broker feed is connected the answer is "unavailable".
+        raise DataUnavailable(f"{symbol} futures candles", "the Alice Blue feed is not connected yet", "Alice Blue",
+                              "ALICEBLUE_APP_CODE and ALICEBLUE_API_SECRET in .env, then connecting Alice Blue")
+    return respond(S(request).analysis.chart(symbol, timeframe, bars))
 
 
 @router.get("/analysis/{symbol}")

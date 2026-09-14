@@ -192,8 +192,22 @@ SQLite in WAL mode with versioned migrations. Tables:
   plan, past check), price floor and ceiling, market mood and latest updates. Every term has an (i) button
   (`web/src/lib/help.ts`); the raw numbers sit under "Advanced details". The sidebar shows six main pages, with the
   rest under "More tools".
-- **Chart:** `components/LiveChart.tsx` draws candles with TradingView Lightweight Charts on DalalSight's own data
-  (`GET /api/chart/{symbol}`), because TradingView's embed widget refuses NSE/BSE symbols. BUY/SELL arrows come from
+- **Chart:** Home has one main chart, `components/TradingChart.tsx`, laid out like the TradingView app on a black
+  background (top toolbar with Spot/Futures, candle size, chart type and an Indicators menu, RSI/MACD panes, trend and
+  horizontal line drawings saved per chart in the browser, full screen, snapshot). Each BUY/SELL arrow shows a
+  **past-check %** (`lib/calibration.ts`): in the newest backtest of that market and candle size, how often readings in
+  the same bullish-% bucket went the arrow's way first (+1 ATR before −1 ATR), shown only with at least 30 resolved
+  cases. It is not a promise. The signal box shows it as "Worked before" next to the "Model score" (the engine's
+  bullish or bearish %), which is labelled as not a win chance because it is not calibrated.
+- **TradingView button:** opens `components/TradingViewPanel.tsx`, TradingView's own free Advanced Chart widget. Outside
+  tradingview.com it only draws BSE markets (SENSEX, BANKEX, and stocks as `BSE:<symbol>` with `_` for special
+  characters) on daily, weekly or monthly candles; NSE markets such as NIFTY show "only available on TradingView", so
+  the panel explains that instead (checked 15 Sep 2026). The widget can't show DalalSight's arrows or %.
+  `TRADINGVIEW_WIDGET_ENABLED=false` turns it off.
+- **Chart data:** it is drawn with TradingView Lightweight Charts on DalalSight's own data
+  (`GET /api/chart/{symbol}`), because TradingView's embed widget refuses NSE, tradingview.com cannot be framed, and the
+  full Advanced Charts library is licensed only for public websites. `feed=futures` answers "Data
+  unavailable" until the Alice Blue feed is connected; spot candles are never shown as futures. BUY/SELL arrows come from
   `GET /api/signals/history/{symbol}`: the engine rebuilt at each of the last 250 candle closes (no look-ahead, cached, about
   9 s the first time) plus setups the monitor recorded live. It refreshes every 20 s while the market is open.
 - **Pine Script (optional, Settings):** `tradingview/dalalsight_signal_engine.pine` mirrors the signal engine on

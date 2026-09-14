@@ -1,3 +1,4 @@
+import { pastRate, useCalibration } from "../lib/calibration";
 import { istTime, num, pct, signed } from "../lib/format";
 import type { HelpTopic } from "../lib/help";
 import { strengthOf, verdictFor } from "../lib/plain";
@@ -42,6 +43,8 @@ const CHECK_NAMES: Record<string, string> = {
   options: "options",
 };
 
+const chanceTone = (rate: number): Tone => (rate >= 55 ? "bull" : rate >= 45 ? "warn" : "bear");
+
 function PlanRow({ label, value, topic, tone }: { label: string; value: string; topic: HelpTopic; tone?: Tone }) {
   return (
     <div className="flex items-center justify-between gap-2 border-t border-edge/60 py-1.5 first:border-t-0">
@@ -65,6 +68,17 @@ export default function SignalSummary({ snap }: { snap: Snapshot }) {
   const down = checks.filter((c) => c.score < 0).slice(0, 3);
   const missing = signal.components.filter((c) => !c.available).map((c) => CHECK_NAMES[c.name] ?? c.name);
 
+  const calibration = useCalibration(snap.symbol, snap.timeframe);
+  const latest = calibration.data?.symbol === snap.symbol && calibration.data.timeframe === snap.timeframe ? calibration.data : null;
+  const past = pastRate(latest, signal.bullish_pct, signal.direction);
+  const falling = signal.direction < 0;
+  const score = falling ? 100 - signal.bullish_pct : signal.bullish_pct;
+  let pastNote = "checking…";
+  if (latest && !latest.available) pastNote = "not tested yet for this market and candle size";
+  else if (past && !past.enough) pastNote = `only ${past.resolved} past cases, too few`;
+  else if (past) pastNote = `went ${falling ? "down" : "up"} first in ${past.resolved} past cases`;
+  else if (latest) pastNote = "no past cases match this reading";
+
   return (
     <Card title={`Signal · ${snap.symbol}`} info={<Help topic="signal" />} actions={<span className="text-[11px] text-muted">{TIMEFRAME_LABELS[snap.timeframe] ?? snap.timeframe} candles</span>}>
       <div className="flex flex-wrap items-end justify-between gap-2">
@@ -85,6 +99,23 @@ export default function SignalSummary({ snap }: { snap: Snapshot }) {
           {view.title}
         </div>
         <p className="mt-1 text-xs leading-relaxed text-text">{view.text}</p>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-lg border border-edge bg-bg/40 p-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted">
+            Worked before <Help topic="probability" />
+          </div>
+          <div className={`font-mono text-2xl leading-tight ${past?.enough ? TEXT_TONES[chanceTone(past.rate)] : "text-muted"}`}>{past?.enough ? `${num(past.rate, 0)}%` : "—"}</div>
+          <div className="text-[11px] leading-snug text-muted">{pastNote}</div>
+        </div>
+        <div className="rounded-lg border border-edge bg-bg/40 p-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted">
+            Model score <Help topic="probability" align="right" />
+          </div>
+          <div className="font-mono text-2xl leading-tight text-info">{num(score, 0)}%</div>
+          <div className="text-[11px] leading-snug text-muted">{falling ? "bearish" : "bullish"} reading, not a win chance</div>
+        </div>
       </div>
 
       <div className="mt-3">
@@ -127,7 +158,7 @@ export default function SignalSummary({ snap }: { snap: Snapshot }) {
       </div>
       {missing.length > 0 && <p className="mt-2 text-[11px] text-muted">No data for {missing.join(", ")} on this market, so those checks are skipped.</p>}
 
-      <CalibrationNote symbol={snap.symbol} timeframe={snap.timeframe} bullish={signal.bullish_pct} direction={signal.direction} />
+      <CalibrationNote symbol={snap.symbol} timeframe={snap.timeframe} bullish={signal.bullish_pct} direction={signal.direction} latest={latest} />
 
       <p className="mt-3 text-[11px] leading-snug text-muted">
         Based on the last finished candle ({istTime(signal.bar_time, { date: true })}). For learning and research, not investment advice. DalalSight never places real orders.

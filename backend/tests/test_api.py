@@ -54,6 +54,8 @@ def test_analysis_and_chart(client):
     assert times[-1] == int(pd.Timestamp(chart["provenance"]["last_bar"]).timestamp()) + 19800  # IST wall-clock seconds
     assert times[-1] - times[-2] == 15 * 60
     assert chart["indicators"]["ema_fast"] and chart["levels"]["levels"]
+    futures = client.get("/api/chart/NIFTY?timeframe=5m&feed=futures")
+    assert futures.status_code == 503 and futures.json()["detail"]["source"] == "Alice Blue"  # never spot data in disguise
 
 
 def test_signal_history_gives_chart_markers(client):

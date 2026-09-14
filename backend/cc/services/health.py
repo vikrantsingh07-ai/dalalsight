@@ -82,8 +82,9 @@ class HealthService:
         add("Email alerts", "ONLINE" if self.env.email_configured else "NOT_CONFIGURED", "SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, ALERT_EMAIL_TO")
         add("Webhook alerts", "ONLINE" if self.env.alert_webhook_url else "NOT_CONFIGURED", "ALERT_WEBHOOK_URL")
         add("TradingView", "ONLINE" if self.env.tradingview_widget_enabled else "DISABLED",
-            "dashboard chart uses TradingView Lightweight Charts with DalalSight data and BUY/SELL markers "
-            "(TradingView's embed widget cannot show NSE/BSE); optional Pine Script indicator in Settings")
+            "Home's chart uses TradingView Lightweight Charts with DalalSight data, BUY/SELL markers and past-check %; "
+            "a TradingView button opens the real TradingView widget (BSE markets on daily/weekly candles; TradingView "
+            "blocks NSE in embeds); optional Pine Script indicator in Settings")
         settings = self.settings_store.get()
         add("Execution safety", "ONLINE", f"mode {settings.execution_mode.upper()}; live execution "
             + ("ENABLED in env but no broker adapter" if self.env.live_execution_enabled else "disabled"))
