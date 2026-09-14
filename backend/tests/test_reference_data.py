@@ -58,6 +58,14 @@ def test_stale_lists_are_retried_instead_of_kept_forever(tmp_path, offline, monk
     assert len(calls) == 1
 
 
+def test_search_puts_the_exact_symbol_first(tmp_path, offline):
+    registry = SymbolRegistry(tmp_path)
+    results = registry.search("RELIANCE")
+    assert results[0]["symbol"] == "RELIANCE"  # not a company whose name merely contains "Reliance"
+    assert registry.search("NIFTY")[0]["symbol"] == "NIFTY"
+    assert [r["symbol"] for r in registry.search("TCS")][:1] == ["TCS"]
+
+
 def test_a_list_missing_everywhere_is_unavailable(tmp_path, offline, monkeypatch):
     monkeypatch.setattr(symbols, "SEED_DIR", tmp_path / "no-seed")
     with pytest.raises(DataUnavailable):

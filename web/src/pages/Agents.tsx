@@ -56,7 +56,11 @@ export default function Agents() {
 
   return (
     <div className="space-y-3">
-      <PageHeader title="Trading agents" subtitle="The five TradingAgents analysts run unchanged on the configured model; each report is normalised to a shared schema and combined with the rule-based technical engine into a confidence-weighted consensus." />
+      <PageHeader
+        title="AI analysts"
+        subtitle="Ask five AI analysts (market, news, sentiment, company numbers, F&O) for their view. One analyst takes about 10 minutes."
+        info="The five TradingAgents analysts run on the configured AI model. Each report is turned into a common format and combined with the rule-based technical engine into a confidence-weighted overall view."
+      />
       <div className="grid gap-3 xl:grid-cols-[380px_minmax(0,1fr)]">
         <div className="space-y-3">
           <Card title="Run agents">

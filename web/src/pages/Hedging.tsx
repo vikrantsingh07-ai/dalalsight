@@ -87,7 +87,11 @@ export default function Hedging() {
 
   return (
     <div className="space-y-3">
-      <PageHeader title="Portfolio hedging" subtitle="Beta-weighted exposure from one year of daily returns, index futures and protective-put/collar hedges priced from the live chain, and scenario P&L." />
+      <PageHeader
+        title="Portfolio hedging"
+        subtitle="See how much your stock holdings move with the market, and what protection against a fall would cost."
+        info="Beta-weighted exposure from one year of daily returns, index futures and protective-put/collar hedges priced from the live option chain, and scenario P&L."
+      />
       <Card title="Positions">
         <div className="space-y-2">
           {positions.map((position, i) => (

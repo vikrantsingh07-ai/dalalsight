@@ -16,7 +16,11 @@ export default function Signals() {
   const [tab, setTab] = useLocalState<Tab>("cc_signals_tab", "signals");
   return (
     <div className="space-y-3">
-      <PageHeader title="Signals, paper trading & backtests" subtitle="Every engine setup is recorded and evaluated against later bars. Paper trades fill at real quotes. Backtests replay the same engine without look-ahead.">
+      <PageHeader
+        title="Practice & history"
+        subtitle="See past signals and how they worked out, practise with pretend trades, and test the signals on old data."
+        info="Every engine setup is recorded and checked against the candles that came after it. Paper (pretend) trades fill at real prices. Backtests replay the same engine on history without peeking at the future."
+      >
         <Tabs
           tabs={[
             { id: "signals", label: "Signal history" },

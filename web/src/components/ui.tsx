@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 import { ApiError, describe } from "../lib/api";
+import InfoTip from "./InfoTip";
 import { TEXT_TONES, type Tone } from "../lib/tones";
 import { isUnavailable, type Unavailable } from "../lib/types";
 
@@ -29,12 +30,15 @@ export function Pill({ tone = "muted", children, title, className = "" }: { tone
   );
 }
 
-export function Card({ title, actions, children, className = "", bodyClass = "p-3" }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string }) {
+export function Card({ title, info, actions, children, className = "", bodyClass = "p-3" }: { title?: ReactNode; info?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClass?: string }) {
   return (
     <section className={`min-w-0 rounded-lg border border-edge bg-panel ${className}`}>
       {(title || actions) && (
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-edge px-3 py-2">
-          <h2 className="font-display text-sm font-semibold tracking-wide text-text">{title}</h2>
+          <h2 className="flex items-center gap-1.5 font-display text-sm font-semibold tracking-wide text-text">
+            {title}
+            {info}
+          </h2>
           {actions && <div className="flex flex-wrap items-center gap-1.5">{actions}</div>}
         </header>
       )}
@@ -163,11 +167,14 @@ export function Empty({ children }: { children: ReactNode }) {
   return <div className="rounded border border-dashed border-edge px-3 py-6 text-center text-xs text-muted">{children}</div>;
 }
 
-export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children?: ReactNode }) {
+export function PageHeader({ title, subtitle, info, children }: { title: string; subtitle?: ReactNode; info?: ReactNode; children?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="font-display text-xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="flex items-center gap-2 font-display text-xl font-semibold tracking-tight">
+          {title}
+          {info && <InfoTip title={`About: ${title}`}>{info}</InfoTip>}
+        </h1>
         {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}

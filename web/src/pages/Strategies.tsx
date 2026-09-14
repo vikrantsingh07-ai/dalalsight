@@ -83,7 +83,11 @@ export default function Strategies() {
 
   return (
     <div className="space-y-3">
-      <PageHeader title="Options strategy builder" subtitle="Legs priced from the live NSE chain. Payoff, breakevens, max profit/loss, lognormal probability of profit and net Greeks; margin needs a broker API." />
+      <PageHeader
+        title="Strategy builder"
+        subtitle="Build an options strategy and see its possible profit and loss before trading."
+        info="Each leg is priced from the live NSE option chain. Shows the payoff, breakeven prices, maximum profit and loss, an estimated probability of profit and net Greeks. Margin needs a broker API."
+      />
       <Card>
         <div className="flex flex-wrap items-end gap-2">
           <form

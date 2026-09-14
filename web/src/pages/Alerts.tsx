@@ -64,7 +64,11 @@ export default function Alerts() {
 
   return (
     <div className="space-y-3">
-      <PageHeader title="Alerts" subtitle="Rules are evaluated on every monitor cycle with per-alert cooldowns. Dashboard, browser, sound and voice are delivered here; Telegram, email and webhook are sent by the backend when configured in .env.">
+      <PageHeader
+        title="Alerts"
+        subtitle="Get a sound, pop-up or message when a price is crossed or the signal changes."
+        info="Alerts are checked every monitor cycle (every 30 seconds while the market is open), with a pause after each alert so you aren't flooded. Dashboard, browser, sound and voice alerts show here; Telegram, email and webhook alerts need settings in the server's .env file."
+      >
         <Button
           onClick={() => {
             if ("Notification" in window) void Notification.requestPermission().then(setPermission);

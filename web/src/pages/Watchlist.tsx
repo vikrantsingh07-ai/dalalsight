@@ -4,13 +4,12 @@ import { useApp } from "../context/AppContext";
 import { get } from "../lib/api";
 import { istTime, num, pct } from "../lib/format";
 import { useApi } from "../lib/hooks";
-import { tvChartUrl, tvSymbolFor } from "../lib/tradingview";
 import { isUnavailable, type InstrumentMeta, type Quote, type Unavailable } from "../lib/types";
 import { TEXT_TONES, toneForNumber } from "../lib/tones";
 import { Button, Card, Empty, ErrorNote, Input, PageHeader, Spinner, Table } from "../components/ui";
 
 export default function Watchlist() {
-  const { settings, saveSettings, setSymbol, status, config } = useApp();
+  const { settings, saveSettings, setSymbol, status } = useApp();
   const navigate = useNavigate();
   const list = settings?.watchlist ?? [];
   const quotes = useApi<Record<string, Quote | Unavailable>>(list.length ? `/api/quotes?symbols=${encodeURIComponent(list.join(","))}` : null, {
@@ -48,9 +47,18 @@ export default function Watchlist() {
     void save(next);
   };
 
+  const openChart = (item: string) => {
+    setSymbol(item);
+    navigate("/");
+  };
+
   return (
     <div className="space-y-3">
-      <PageHeader title="Watchlist" subtitle="Quotes: NSE public API for indices, Yahoo Finance for stocks. Timestamps show the actual quote time.">
+      <PageHeader
+        title="My watchlist"
+        subtitle="Markets and stocks you follow, with today's price. Click a name or Chart to see its signal and chart on Home."
+        info="Index prices come from NSE, stock prices from Yahoo Finance. The time column shows when each price was last updated."
+      >
         {quotes.loading && <Spinner label="Refreshing" />}
       </PageHeader>
       <Card>
@@ -61,7 +69,7 @@ export default function Watchlist() {
             void add();
           }}
         >
-          <Input value={input} onChange={(event) => setInput(event.target.value.toUpperCase())} placeholder="Add NSE symbol or index (e.g. TCS, BANKNIFTY)" className="w-72 font-mono" />
+          <Input id="watchlist-add" value={input} onChange={(event) => setInput(event.target.value.toUpperCase())} placeholder="Add a stock or index, e.g. TCS or BANKNIFTY" className="w-72 font-mono" />
           <Button type="submit" variant="primary">
             Add
           </Button>
@@ -73,19 +81,19 @@ export default function Watchlist() {
       <Card bodyClass="p-0">
         {list.length === 0 ? (
           <div className="p-3">
-            <Empty>The watchlist is empty.</Empty>
+            <Empty>Your watchlist is empty. Add a stock or index above.</Empty>
           </div>
         ) : (
           <Table>
             <thead>
               <tr>
-                <th>Symbol</th>
+                <th>Name</th>
                 <th>Price</th>
                 <th>Change</th>
                 <th>%</th>
                 <th>Day low</th>
                 <th>Day high</th>
-                <th>Quote time</th>
+                <th>Updated</th>
                 <th>Source</th>
                 <th />
               </tr>
@@ -97,14 +105,7 @@ export default function Watchlist() {
                 return (
                   <tr key={item}>
                     <td>
-                      <button
-                        type="button"
-                        className="font-mono text-accent hover:underline"
-                        onClick={() => {
-                          setSymbol(item);
-                          navigate("/");
-                        }}
-                      >
+                      <button type="button" className="font-mono text-accent hover:underline" onClick={() => openChart(item)}>
                         {item}
                       </button>
                     </td>
@@ -126,15 +127,9 @@ export default function Watchlist() {
                       </td>
                     )}
                     <td className="whitespace-nowrap text-right">
-                      <a
-                        className="mr-1 inline-flex rounded border border-edge px-2 py-1 text-[11px] text-accent hover:border-muted"
-                        href={tvChartUrl(tvSymbolFor(item, config))}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open in TradingView"
-                      >
-                        TradingView ↗
-                      </a>
+                      <Button className="mr-1" onClick={() => openChart(item)} aria-label={`Open ${item} chart`}>
+                        Chart
+                      </Button>
                       <Button variant="ghost" onClick={() => move(index, -1)} disabled={index === 0} aria-label={`Move ${item} up`}>
                         ↑
                       </Button>

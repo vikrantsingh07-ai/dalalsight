@@ -270,18 +270,19 @@ class SymbolRegistry:
         )
 
     def search(self, query: str, limit: int = 20) -> list[dict]:
+        """Indices and NSE equities matching ``query``: exact symbol first, then symbols starting with it, then names."""
         q = query.strip().upper()
-        results = [
-            {"symbol": key, "name": info.name, "kind": "index"}
-            for key, info in INDEX_TABLE.items()
-            if q in key or q in info.name
-        ]
+        ranked: list[tuple[int, str, dict]] = []
+        for key, info in INDEX_TABLE.items():
+            if q in key or q in info.name:
+                rank = 0 if key == q else 1 if key.startswith(q) else 3
+                ranked.append((rank, key, {"symbol": key, "name": info.name, "kind": "index"}))
         try:
             for symbol, name in self.equities().items():
-                if len(results) >= limit:
-                    break
                 if symbol.startswith(q) or q in name.upper():
-                    results.append({"symbol": symbol, "name": name, "kind": "stock"})
+                    rank = 0 if symbol == q else 2 if symbol.startswith(q) else 4
+                    ranked.append((rank, symbol, {"symbol": symbol, "name": name, "kind": "stock"}))
         except DataUnavailable:
             pass
-        return results[:limit]
+        ranked.sort(key=lambda item: (item[0], item[1]))
+        return [item[2] for item in ranked[:limit]]

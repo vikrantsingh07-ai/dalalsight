@@ -15,7 +15,7 @@ It is one repository with one Python environment.
 | Part | Folder | What it does |
 |---|---|---|
 | Backend API | `backend/cc` | FastAPI server with data providers, analysis engines, AI layer, market monitor, alerts, paper trading, backtests, REST + WebSocket |
-| Dashboard | `web/` | React 19 + TypeScript + Tailwind with 13 pages and a voice assistant. Deployable to Vercel. |
+| Dashboard | `web/` | React 19 + TypeScript + Tailwind: a beginner-friendly Home page (live chart with BUY/SELL arrows, plain-language signal, (i) help on every term), 12 more pages and a voice assistant. Deployable to Vercel. |
 | Agent engine | `packages/tradingagents` | TradingAgents extended for NSE/BSE, F&O, MCX and currencies ([UPSTREAM.md](packages/tradingagents/UPSTREAM.md)) |
 | TradingView | `tradingview/` | The signal engine as a Pine Script v6 indicator for your TradingView app |
 | Docs | `docs/` | [How it works](docs/HOW_IT_WORKS.md) · [Deployment (Vercel + backend)](docs/DEPLOYMENT.md) · design notes |
@@ -85,8 +85,10 @@ and `/ws` to port 8765.
    - It rejects AI text that contains numbers missing from the facts it was given.
    - Commentary is event-driven. The assistant answers in 9 fixed sections.
    - **Agent runs** execute the TradingAgents analysts (market, sentiment, news, fundamentals, F&O) and combine them into a consensus.
-5. **Charts:** charts open in TradingView itself, because TradingView embeds cannot show NSE/BSE data. The Pine Script indicator puts
-   the same signals, levels and alerts on your TradingView chart.
+5. **Chart:** the Home page draws a candlestick chart with TradingView Lightweight Charts on DalalSight's own data, with the
+   engine's BUY/SELL arrows, price floor/ceiling and the current plan (TradingView's embed widget refuses NSE/BSE symbols).
+   Everything is explained in plain words with (i) buttons. An optional Pine Script indicator (Settings) puts the same
+   signals on your own TradingView chart.
 
 Full walkthrough with diagrams: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
 
@@ -132,7 +134,7 @@ are validated and stored in SQLite.
 
 ## TradingView indicator
 
-`tradingview/dalalsight_signal_engine.pine` is also served at `/api/tradingview/pine` and copyable from the Dashboard.
+`tradingview/dalalsight_signal_engine.pine` is also served at `/api/tradingview/pine` and copyable from Settings (optional: the dashboard has its own chart).
 
 1. TradingView app → Pine Editor → Open → New indicator → paste → Save → Add to chart.
 2. Use futures charts (`NSE:NIFTY1!`, `NSE:BANKNIFTY1!`) for the volume and VWAP components.
@@ -151,7 +153,8 @@ cd packages/tradingagents && ../../.venv/Scripts/python.exe -m pytest -q -p no:c
 
 ## Known limitations
 
-- **TradingView:** embeds cannot display NSE/BSE symbols, so charts open in TradingView itself.
+- **TradingView:** the embed widget cannot display NSE/BSE symbols, so the dashboard chart uses TradingView Lightweight
+  Charts with DalalSight's own data. Past BUY/SELL markers take about 9 seconds to compute the first time per market and candle size.
 - **NSE data:** the public endpoints are unofficial, may throttle or change, and often reject cloud data-center IPs.
 - **AI limits:** free OpenRouter models are slow and rate limited. One TradingAgents analyst takes about 10 minutes, and the daily budget is enforced.
 - **Data that fills in over time:**

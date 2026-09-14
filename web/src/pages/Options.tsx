@@ -34,7 +34,11 @@ export default function OptionsPage() {
 
   return (
     <div className="space-y-3">
-      <PageHeader title="Options chain & analytics" subtitle="Live NSE option chain: OI, volume, bid/ask and IV from the exchange; Greeks via Black-Scholes. Recommendations only when the signal engine has a setup.">
+      <PageHeader
+        title="Options chain"
+        subtitle="Live NSE option prices: where traders are betting on a rise or a fall, and at which prices."
+        info="Open interest (OI), volume, bid/ask and implied volatility come from NSE; Greeks are calculated with Black-Scholes. Contract ideas appear only when the signal engine has a setup."
+      >
         {(chain.loading || expiries.loading) && <Spinner label="Loading chain" />}
       </PageHeader>
       <Card>

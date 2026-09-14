@@ -188,8 +188,16 @@ SQLite in WAL mode with versioned migrations. Tables:
   holds the active symbol, timeframe, settings and status.
 - **Hosting:** when the dashboard is hosted apart from the API (Vercel), `VITE_API_BASE_URL` and optionally `VITE_WS_URL` point it
   at the backend. See [DEPLOYMENT.md](DEPLOYMENT.md).
-- **Charts:** charts open in TradingView through links. `tradingview/dalalsight_signal_engine.pine` mirrors the signal engine on
-  your TradingView chart. It uses the same default weights, thresholds, crossover and VWAP rules, and builds levels the
+- **Home (beginner view):** a 3-step welcome guide, a plain-language signal box (BUY / SELL / WAIT, strength, reasons,
+  plan, past check), price floor and ceiling, market mood and latest updates. Every term has an (i) button
+  (`web/src/lib/help.ts`); the raw numbers sit under "Advanced details". The sidebar shows six main pages, with the
+  rest under "More tools".
+- **Chart:** `components/LiveChart.tsx` draws candles with TradingView Lightweight Charts on DalalSight's own data
+  (`GET /api/chart/{symbol}`), because TradingView's embed widget refuses NSE/BSE symbols. BUY/SELL arrows come from
+  `GET /api/signals/history/{symbol}`: the engine rebuilt at each of the last 250 candle closes (no look-ahead, cached, about
+  9 s the first time) plus setups the monitor recorded live. It refreshes every 20 s while the market is open.
+- **Pine Script (optional, Settings):** `tradingview/dalalsight_signal_engine.pine` mirrors the signal engine on
+  your own TradingView chart. It uses the same default weights, thresholds, crossover and VWAP rules, and builds levels the
   same way (session OHLC, last 5 confirmed swings each side, EMA slow, SMA 50/200, VWAP, merged within 0.15 ATR).
   Option data isn't available in Pine, so that weight counts as unavailable there, and the volume-profile and
   option-OI levels are skipped. `backend/tests/test_pine_sync.py` fails if the Pine defaults or labels drift.

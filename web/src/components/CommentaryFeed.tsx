@@ -1,10 +1,11 @@
+import type { ReactNode } from "react";
 import { useApi, useEvents } from "../lib/hooks";
 import { istTime } from "../lib/format";
 import type { CommentaryEntry } from "../lib/types";
 import { toneForPriority } from "../lib/tones";
 import { Card, Empty, ErrorNote, Pill } from "./ui";
 
-export default function CommentaryFeed({ symbol, mode, limit = 50, title = "Live AI commentary", className = "" }: { symbol?: string; mode?: "live" | "replay"; limit?: number; title?: string; className?: string }) {
+export default function CommentaryFeed({ symbol, mode, limit = 50, title = "Live AI commentary", info, className = "" }: { symbol?: string; mode?: "live" | "replay"; limit?: number; title?: string; info?: ReactNode; className?: string }) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (symbol) params.set("symbol", symbol);
   if (mode) params.set("mode", mode);
@@ -22,11 +23,9 @@ export default function CommentaryFeed({ symbol, mode, limit = 50, title = "Live
   });
 
   return (
-    <Card title={title} className={className} bodyClass="max-h-[520px] overflow-y-auto p-3">
+    <Card title={title} info={info} className={className} bodyClass="max-h-[520px] overflow-y-auto p-3">
       <ErrorNote error={feed.error} />
-      {feed.data && feed.data.length === 0 && (
-        <Empty>No commentary yet. It is produced only on material changes while the market is open, or during a labelled REPLAY.</Empty>
-      )}
+      {feed.data && feed.data.length === 0 && <Empty>No updates yet. Notes appear here when something important happens while the market is open.</Empty>}
       <ol className="space-y-2.5">
         {(feed.data ?? []).map((entry) => (
           <li key={entry.id} className="rounded border border-edge bg-bg/40 p-2">

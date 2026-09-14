@@ -92,7 +92,11 @@ export default function Stocks() {
   const indices = config?.indices ?? {};
   return (
     <div className="space-y-3">
-      <PageHeader title="Stock analysis & scanner" subtitle="Transparent rule-based scores from daily data; fundamentals from the vendor feed and marked unavailable when not published.">
+      <PageHeader
+        title="Stocks"
+        subtitle="Check one stock's health, or scan a list of stocks to find the strong ones."
+        info="Scores are rule-based and use daily prices. Company numbers (fundamentals) come from the data vendor and show as unavailable when not published."
+      >
         <Tabs
           tabs={[
             { id: "analysis", label: "Stock analysis" },

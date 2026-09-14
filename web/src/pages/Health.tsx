@@ -18,7 +18,11 @@ export default function Health() {
 
   return (
     <div className="space-y-3">
-      <PageHeader title="System health" subtitle={data ? `Checked ${istTime(data.generated_at, { seconds: true })}` : undefined}>
+      <PageHeader
+        title="System health"
+        subtitle={data ? `Checked ${istTime(data.generated_at, { seconds: true })}` : undefined}
+        info="Shows whether each part of DalalSight is working: market data feeds, the AI model, the database and the live market monitor. ONLINE is good; DEGRADED means partly working."
+      >
         {data && (
           <Pill tone={toneForStatus(data.overall)} className="px-2 py-1 text-xs">
             overall {data.overall}

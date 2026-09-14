@@ -56,6 +56,16 @@ def test_analysis_and_chart(client):
     assert chart["indicators"]["ema_fast"] and chart["levels"]["levels"]
 
 
+def test_signal_history_gives_chart_markers(client):
+    body = client.get("/api/signals/history/NIFTY?timeframe=5m&bars=120").json()
+    assert body["bars"] == 120 and body["latest"]["label"] in LABELS
+    candle_times = {c["time"] for c in client.get("/api/chart/NIFTY?timeframe=5m&bars=300").json()["candles"]}
+    for marker in body["markers"]:
+        assert marker["time"] in candle_times and marker["side"] in ("BUY", "SELL")
+        assert marker["label"] in (LABEL_BULL, LABEL_BEAR, LABEL_HIGH_RISK)
+    assert client.get("/api/signals/history/NIFTY?timeframe=5m&bars=120").json()["markers"] == body["markers"]  # cached
+
+
 def test_invalid_inputs_are_rejected(client):
     assert client.get("/api/analysis/NIFTY?timeframe=2m").status_code == 422
     assert client.get("/api/analysis/NI$FTY").status_code == 422

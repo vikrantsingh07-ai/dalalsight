@@ -360,6 +360,13 @@ def signals(request: Request, symbol: str | None = None, status: Literal["open",
     return respond(S(request).signals.list(limit, _sym(request, symbol) if symbol else None, status))
 
 
+@router.get("/signals/history/{symbol}")
+def signal_history(request: Request, symbol: str, timeframe: str = "5m", bars: int = Query(250, ge=20, le=600)):
+    """BUY/SELL markers for the chart: the engine's signal rebuilt at each recent bar close (no look-ahead)."""
+    _limit(request, "signal_history", 60, 60)
+    return respond(S(request).analysis.signal_history(_sym(request, symbol), _tf(timeframe), bars))
+
+
 @router.get("/signals/stats")
 def signal_stats(request: Request):
     return respond(S(request).signals.stats())

@@ -4,6 +4,7 @@ import { post } from "../lib/api";
 import { humanize } from "../lib/format";
 import type { Priority, Settings } from "../lib/types";
 import { listVoices, speak } from "../lib/voice";
+import PineScriptCard from "../components/PineScriptCard";
 import { Button, Card, Checkbox, ErrorNote, Field, Input, PageHeader, Pill, Select, Spinner } from "../components/ui";
 
 const PRIORITIES: Priority[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
@@ -85,7 +86,11 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-3">
-      <PageHeader title="Settings" subtitle="Validated on the server. Secrets (API keys, tokens) are configured only in .env and are never shown here.">
+      <PageHeader
+        title="Settings"
+        subtitle="Change how DalalSight looks and behaves. Keys and passwords are never shown here."
+        info="Every change is checked on the server before it is saved. API keys and tokens are set only in the .env file on the server."
+      >
         {draft && <Pill tone="warn">unsaved changes</Pill>}
         {saved && <Pill tone="bull">saved</Pill>}
         <Button onClick={() => setDraft(null)} disabled={!draft}>
@@ -309,6 +314,7 @@ export default function SettingsPage() {
           </Field>
         </Section>
       </div>
+      <PineScriptCard />
     </div>
   );
 }

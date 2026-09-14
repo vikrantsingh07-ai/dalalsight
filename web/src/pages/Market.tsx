@@ -52,7 +52,11 @@ export default function Market() {
 
   return (
     <div className="space-y-3">
-      <PageHeader title="Market overview" subtitle={data ? `${data.market.label} · updated ${istTime(data.generated_at, { seconds: true })}` : undefined}>
+      <PageHeader
+        title="Market today"
+        subtitle={data ? `${data.market.label} · updated ${istTime(data.generated_at, { seconds: true })}` : undefined}
+        info="All major NSE and BSE indices and sectors at a glance. Green means up today, red means down. Click an index to open its signal and chart on Home."
+      >
         {overview.loading && <Spinner label="Refreshing" />}
       </PageHeader>
       <ErrorNote error={overview.error} />

@@ -243,6 +243,28 @@ export interface ChartData {
   provenance: Provenance;
 }
 
+export interface SignalHistoryMarker {
+  time: number;
+  bar_time: string;
+  label: string;
+  direction: number;
+  side: "BUY" | "SELL";
+  risky: boolean;
+  bullish_pct: number;
+  confidence: number;
+  price: number;
+}
+
+export interface SignalHistory {
+  symbol: string;
+  timeframe: string;
+  bars: number;
+  markers: SignalHistoryMarker[];
+  latest: { bar_time: string; label: string; direction: number; bullish_pct: number; confidence: number; price: number } | null;
+  counts: Record<string, number>;
+  note: string;
+}
+
 export interface OptionLegView {
   ltp: number | null;
   bid: number | null;

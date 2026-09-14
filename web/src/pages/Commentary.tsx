@@ -59,8 +59,9 @@ export default function Commentary() {
   return (
     <div className="space-y-3">
       <PageHeader
-        title="AI market commentary"
-        subtitle={`Event-driven: only material changes, with cooldowns (${settings?.commentary.event_cooldown_seconds ?? 900}s per event, ${settings?.commentary.min_interval_seconds ?? 120}s between items). HIGH/CRITICAL items may be narrated by the AI model and are rejected if they contain numbers not in the facts.`}
+        title="AI commentary"
+        subtitle="Short notes when something important happens in the market, written by the engine or the AI."
+        info={`Notes are written only on real changes, with pauses (${settings?.commentary.event_cooldown_seconds ?? 900}s per event, ${settings?.commentary.min_interval_seconds ?? 120}s between notes). Important notes may be written by the AI model; any AI note with a number that isn't in the data is rejected.`}
       >
         <Button onClick={() => say("Voice check. Commentary will be spoken for high priority events.")} disabled={!voiceOn}>
           Test voice

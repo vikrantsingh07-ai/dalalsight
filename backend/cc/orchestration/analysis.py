@@ -6,6 +6,7 @@ from analysis (its price is still shown as the live price).
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 
@@ -55,6 +56,9 @@ class AnalysisService:
         self.db = db
         self.options: OptionsService | None = None
         self.latest: dict[tuple[str, str], dict] = {}
+        # signal history per (symbol, timeframe, settings): bar time -> engine signal at that bar's close
+        self._history: dict[tuple, dict[str, dict]] = {}
+        self._history_lock = threading.Lock()
 
     def market_status(self) -> MarketStatus:
         try:
@@ -159,6 +163,74 @@ class AnalysisService:
         if mode == "live":
             self.latest[(symbol, timeframe)] = snap
         return snap
+
+    HISTORY_WINDOW = 300  # trailing bars used to judge each historical bar, as in the backtest
+    HISTORY_WARMUP = 120
+    MARKER_GAP = 6  # bars: a same-direction setup restarting sooner than this is not a new marker
+
+    def signal_history(self, symbol: str, timeframe: str, bars: int = 250) -> dict:
+        """The engine's signal at each of the last ``bars`` completed bars, for BUY/SELL markers on the chart.
+
+        Each bar is judged on a trailing window ending at that bar (as in the backtest), so a marker shows what the engine
+        would have said at that candle's close. Results are cached per bar and only new bars are computed. Option data is
+        excluded because there are no historical option chains.
+        """
+        settings = self.settings()
+        cfg = settings.signal
+        market = self.market_status()
+        raw = self.frame(symbol, timeframe, 600)
+        forming = market.is_trading and len(raw) > 1 and self._forming(raw.index[-1], timeframe, now_ist())
+        completed = raw.iloc[:-1] if forming else raw
+        completed.attrs = dict(raw.attrs)
+        intraday = TIMEFRAME_MINUTES[timeframe] < 1440
+        ind = compute_indicators(completed, cfg, intraday)
+        if len(ind) <= self.HISTORY_WARMUP:
+            raise DataUnavailable(f"{symbol} {timeframe} signal history", f"only {len(ind)} completed bars", raw.attrs.get("provider", ""))
+        key = (symbol, timeframe, cfg.model_dump_json(), settings.risk.model_dump_json(), settings.commentary.level_test_atr)
+        with self._history_lock:
+            cache = self._history.pop(key, {})
+            self._history[key] = cache  # most recently used last
+            while len(self._history) > 24:
+                self._history.pop(next(iter(self._history)))
+        rows: list[dict] = []
+        for i in range(max(self.HISTORY_WARMUP, len(ind) - bars), len(ind)):
+            stamp = ind.index[i].isoformat()
+            entry = cache.get(stamp)
+            if entry is None:
+                window = ind.iloc[max(0, i - self.HISTORY_WINDOW + 1): i + 1]
+                levels = compute_levels(window, intraday, cfg.swing_lookback, cfg.breakout_lookback)
+                events = detect_events(window, levels, cfg, settings.commentary.level_test_atr)
+                signal = build_signal(symbol, timeframe, window, events, levels, detect_regime(window), None, cfg, settings.risk, ["history"])
+                entry = {"bar_time": stamp, "label": signal.label, "direction": signal.direction, "bullish_pct": signal.bullish_pct,
+                         "confidence": signal.model_confidence, "price": signal.price}
+                cache[stamp] = entry
+            rows.append(entry)
+        current = {row["bar_time"] for row in rows}
+        for stamp in [s for s in list(cache) if s not in current]:
+            cache.pop(stamp, None)
+
+        # One marker where a run of setups in one direction begins (BUY up, SELL down); risky = HIGH-RISK at that bar.
+        # A run that restarts within MARKER_GAP bars of the last setup in the same direction counts as the same signal,
+        # so brief interruptions don't stack arrows on top of each other.
+        markers: list[dict] = []
+        previous = 0
+        last_setup = {1: -self.MARKER_GAP - 1, -1: -self.MARKER_GAP - 1}
+        for index, row in enumerate(rows):
+            side = row["direction"] if row["label"] in (LABEL_BULL, LABEL_BEAR, LABEL_HIGH_RISK) else 0
+            if side and side != previous and index - last_setup[side] > self.MARKER_GAP:
+                seconds = int(pd.Timestamp(row["bar_time"]).timestamp()) + IST_OFFSET_SECONDS
+                markers.append({**row, "time": seconds, "side": "BUY" if side > 0 else "SELL", "risky": row["label"] == LABEL_HIGH_RISK})
+            if side:
+                last_setup[side] = index
+            previous = side
+        counts: dict[str, int] = {}
+        for row in rows:
+            counts[row["label"]] = counts.get(row["label"], 0) + 1
+        return {
+            "symbol": symbol, "timeframe": timeframe, "bars": len(rows), "markers": markers, "latest": rows[-1], "counts": counts,
+            "time_basis": "IST wall-clock seconds (UTC epoch + 19800)",
+            "note": "Rebuilt at each candle close from the bars available then (no look-ahead); options data excluded.",
+        }
 
     def chart(self, symbol: str, timeframe: str, bars: int = 500) -> dict:
         raw = self.frame(symbol, timeframe, max(bars, 300))
