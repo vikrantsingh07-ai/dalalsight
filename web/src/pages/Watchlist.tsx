@@ -4,12 +4,13 @@ import { useApp } from "../context/AppContext";
 import { get } from "../lib/api";
 import { istTime, num, pct } from "../lib/format";
 import { useApi } from "../lib/hooks";
+import { tvChartUrl, tvSymbolFor } from "../lib/tradingview";
 import { isUnavailable, type InstrumentMeta, type Quote, type Unavailable } from "../lib/types";
 import { TEXT_TONES, toneForNumber } from "../lib/tones";
 import { Button, Card, Empty, ErrorNote, Input, PageHeader, Spinner, Table } from "../components/ui";
 
 export default function Watchlist() {
-  const { settings, saveSettings, setSymbol, status } = useApp();
+  const { settings, saveSettings, setSymbol, status, config } = useApp();
   const navigate = useNavigate();
   const list = settings?.watchlist ?? [];
   const quotes = useApi<Record<string, Quote | Unavailable>>(list.length ? `/api/quotes?symbols=${encodeURIComponent(list.join(","))}` : null, {
@@ -125,6 +126,15 @@ export default function Watchlist() {
                       </td>
                     )}
                     <td className="whitespace-nowrap text-right">
+                      <a
+                        className="mr-1 inline-flex rounded border border-edge px-2 py-1 text-[11px] text-accent hover:border-muted"
+                        href={tvChartUrl(tvSymbolFor(item, config))}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open in TradingView"
+                      >
+                        TradingView ↗
+                      </a>
                       <Button variant="ghost" onClick={() => move(index, -1)} disabled={index === 0} aria-label={`Move ${item} up`}>
                         ↑
                       </Button>

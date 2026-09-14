@@ -189,3 +189,21 @@ def test_broker_provider_reports_required_credentials(registry):
         broker.get_quote("NIFTY")
     assert "MARKET_DATA_API_KEY" in info.value.requirement and "credentials not configured" in info.value.reason
     assert broker.health().status == "NOT_CONFIGURED"
+
+
+def test_dashboard_html_is_never_served_stale(client):
+    from cc.api.app import DIST
+
+    if not (DIST / "index.html").is_file():
+        pytest.skip("web/dist not built")
+    for path in ("/", "/watchlist"):
+        response = client.get(path)
+        assert response.status_code == 200 and response.headers["cache-control"] == "no-cache"
+    bundle = next((DIST / "assets").glob("*.js"))
+    assert "immutable" in client.get(f"/assets/{bundle.name}").headers["cache-control"]
+
+
+def test_tradingview_pine_script_is_served(client):
+    response = client.get("/api/tradingview/pine")
+    assert response.status_code == 200 and response.text.startswith("//@version=6")
+    assert 'indicator("Command Center Signal Engine"' in response.text and "alertcondition(" in response.text

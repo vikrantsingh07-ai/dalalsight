@@ -71,8 +71,8 @@ class HealthService:
         add("Email alerts", "ONLINE" if self.env.email_configured else "NOT_CONFIGURED", "SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, ALERT_EMAIL_TO")
         add("Webhook alerts", "ONLINE" if self.env.alert_webhook_url else "NOT_CONFIGURED", "ALERT_WEBHOOK_URL")
         add("TradingView", "ONLINE" if self.env.tradingview_widget_enabled else "DISABLED",
-            "official Advanced Chart widget (TradingView's own data, display only); licensed Charting Library "
-            + ("configured" if self.env.tradingview_library_path else "not configured (TRADINGVIEW_CHARTING_LIBRARY_PATH)"))
+            "charts open in TradingView itself (embedded TradingView charts cannot show NSE/BSE data); "
+            "on-chart signals come from the Command Center Pine Script indicator")
         settings = self.settings_store.get()
         add("Execution safety", "ONLINE", f"mode {settings.execution_mode.upper()}; live execution "
             + ("ENABLED in env but no broker adapter" if self.env.live_execution_enabled else "disabled"))

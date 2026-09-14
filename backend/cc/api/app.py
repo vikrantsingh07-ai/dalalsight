@@ -156,7 +156,10 @@ def create_app(env: EnvConfig | None = None, services: Services | None = None, s
                 return respond({"detail": "not found"}, 404)
             candidate = (DIST / path).resolve()
             if path and candidate.is_file() and DIST.resolve() in candidate.parents:
-                return FileResponse(candidate)
-            return FileResponse(DIST / "index.html")
+                # bundles in assets/ have content-hashed names; everything else must revalidate
+                hashed = candidate.parent.name == "assets"
+                return FileResponse(candidate, headers={"Cache-Control": "public, max-age=31536000, immutable" if hashed else "no-cache"})
+            # index.html names the current bundle: never serve a stale copy after a rebuild
+            return FileResponse(DIST / "index.html", headers={"Cache-Control": "no-cache"})
 
     return app

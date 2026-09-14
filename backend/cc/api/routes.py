@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from .. import __version__
@@ -15,7 +16,7 @@ from ..analysis.hedging import HedgeRequest
 from ..analysis.scanner import PRESETS
 from ..analysis.signal_engine import DISCLAIMER
 from ..analysis.strategies import TEMPLATES
-from ..config import TIMEFRAMES
+from ..config import PROJECT_ROOT, TIMEFRAMES
 from ..data.models import DataUnavailable, now_ist
 from ..data.symbols import INDEX_TABLE
 from ..orchestration.stocks import UNIVERSES
@@ -462,3 +463,15 @@ def monitor_refresh(request: Request):
     _limit(request, "refresh", 12, 60)
     S(request).monitor.trigger()
     return respond({"triggered": True})
+
+
+# ---------------------------------------------------------------------------- TradingView
+PINE_SCRIPT = PROJECT_ROOT / "tradingview" / "command_center_signal_engine.pine"
+
+
+@router.get("/tradingview/pine")
+def tradingview_pine():
+    """The signal engine as a Pine Script indicator for the user's own TradingView app."""
+    if not PINE_SCRIPT.is_file():
+        raise HTTPException(404, detail="Pine Script file not found")
+    return PlainTextResponse(PINE_SCRIPT.read_text(encoding="utf-8"), media_type="text/plain; charset=utf-8")
