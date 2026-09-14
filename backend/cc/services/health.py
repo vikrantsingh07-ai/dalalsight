@@ -72,7 +72,7 @@ class HealthService:
         add("Webhook alerts", "ONLINE" if self.env.alert_webhook_url else "NOT_CONFIGURED", "ALERT_WEBHOOK_URL")
         add("TradingView", "ONLINE" if self.env.tradingview_widget_enabled else "DISABLED",
             "charts open in TradingView itself (embedded TradingView charts cannot show NSE/BSE data); "
-            "on-chart signals come from the Command Center Pine Script indicator")
+            "on-chart signals come from DalalSight Pine Script indicator")
         settings = self.settings_store.get()
         add("Execution safety", "ONLINE", f"mode {settings.execution_mode.upper()}; live execution "
             + ("ENABLED in env but no broker adapter" if self.env.live_execution_enabled else "disabled"))

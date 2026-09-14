@@ -133,7 +133,7 @@ class TradingAgentsAdapter:
         self.models = models
         self.max_tool_rounds = max_tool_rounds
         self.max_minutes = max_minutes
-        # TradingAgents retries "overloaded" responses up to 3 times inside one call; the Command Center has its
+        # TradingAgents retries "overloaded" responses up to 3 times inside one call; DalalSight has its
         # own fallback model and budgets, so one retry is enough (an explicit env value still wins).
         os.environ.setdefault("TRADINGAGENTS_UPSTREAM_RETRIES", "1")
 
@@ -191,7 +191,7 @@ class TradingAgentsAdapter:
         graph = TradingAgentsGraph(selected_analysts=[agent], config=self._config(model), callbacks=[usage])
         context = graph.resolve_instrument_context(symbol, asset_type, trade_date)
         context += (
-            "\n\nLive Command Center snapshot (computed from the dashboard's market-data provider; "
+            "\n\nLive DalalSight snapshot (computed from the dashboard's market-data provider; "
             "use it as current context and prefer your tools for detail):\n" + dashboard_context
         )
         state = graph.propagator.create_initial_state(symbol, trade_date, asset_type, "", context)

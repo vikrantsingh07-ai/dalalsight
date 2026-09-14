@@ -60,14 +60,14 @@ def create_app(env: EnvConfig | None = None, services: Services | None = None, s
         task = None
         if start_background:
             task = asyncio.create_task(services.monitor.run())
-            services.timeline.add("system", f"Command Center v{__version__} started on http://{env.host}:{env.port}")
+            services.timeline.add("system", f"DalalSight v{__version__} started on http://{env.host}:{env.port}")
         yield
         if task:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
-    app = FastAPI(title="AI Trading Command Center", version=__version__, lifespan=lifespan, docs_url="/api/docs",
+    app = FastAPI(title="DalalSight", version=__version__, lifespan=lifespan, docs_url="/api/docs",
                   openapi_url="/api/openapi.json")
     app.state.services = services
 

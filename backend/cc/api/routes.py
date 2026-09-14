@@ -61,7 +61,7 @@ def status(request: Request):
     settings = s.settings_store.get()
     ai = s.models.status()
     return respond({
-        "app": {"name": "AI Trading Command Center", "version": __version__, "started_at": s.started_at.isoformat(), "now": now_ist().isoformat()},
+        "app": {"name": "DalalSight", "version": __version__, "started_at": s.started_at.isoformat(), "now": now_ist().isoformat()},
         "market": s.analysis.market_status().to_dict(),
         "ai": {k: ai[k] for k in ("status", "active_model", "last_model_used", "calls_today", "daily_budget", "budget_left", "key_configured", "models", "last_error")},
         "provider": {"name": s.provider.label, "status": s.provider.health().status},
@@ -466,7 +466,7 @@ def monitor_refresh(request: Request):
 
 
 # ---------------------------------------------------------------------------- TradingView
-PINE_SCRIPT = PROJECT_ROOT / "tradingview" / "command_center_signal_engine.pine"
+PINE_SCRIPT = PROJECT_ROOT / "tradingview" / "dalalsight_signal_engine.pine"
 
 
 @router.get("/tradingview/pine")

@@ -212,4 +212,4 @@ class AlertService:
 
     def test(self, channels: Sequence[str]) -> dict:
         return self.deliver({"id": None, "name": "Test alert", "channels": list(channels)},
-                            "Test notification from the AI Trading Command Center.")
+                            "Test notification from DalalSight.")

@@ -1,4 +1,4 @@
-# AI Trading Command Center — implementation plan
+# DalalSight — implementation plan
 
 Decisions below come from the Phase 1–3 inspection (`EXISTING_SYSTEM.md`). The guiding rule:
 accuracy, transparency and auditability over signal volume. Nothing is simulated except
@@ -7,7 +7,7 @@ clearly-labelled PAPER trading and REPLAY of recorded sessions.
 ## Placement and runtime
 
 ```
-D:\Crypto Algo\command_center\
+D:\DalalSight\dalalsight\
   backend/cc/        FastAPI app + engines (Python 3.12, own .venv, TradingAgents installed editable)
   backend/tests/     pytest (no network; fake providers)
   web/               React 19 + Vite + TypeScript + Tailwind 4 + TradingView Lightweight Charts

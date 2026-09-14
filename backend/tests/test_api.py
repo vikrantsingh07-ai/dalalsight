@@ -206,7 +206,7 @@ def test_dashboard_html_is_never_served_stale(client):
 def test_tradingview_pine_script_is_served(client):
     response = client.get("/api/tradingview/pine")
     assert response.status_code == 200 and response.text.startswith("//@version=6")
-    assert 'indicator("Command Center Signal Engine"' in response.text and "alertcondition(" in response.text
+    assert 'indicator("DalalSight Signal Engine"' in response.text and "alertcondition(" in response.text
 
 
 def test_cors_lets_a_separately_hosted_dashboard_use_the_token(registry, provider):

@@ -142,7 +142,7 @@ class ModelManager:
 
     def _post(self, model: str, messages: list[dict], max_tokens: int, temperature: float, purpose: str) -> str:
         headers = {"Authorization": f"Bearer {self.env.ai_api_key()}", "Content-Type": "application/json",
-                   "X-Title": "AI Trading Command Center"}
+                   "X-Title": "DalalSight"}
         body = {"model": model, "messages": messages, "max_tokens": max_tokens, "temperature": temperature}
         try:
             resp = requests.post(f"{self.env.ai_base_url.rstrip('/')}/chat/completions", json=body, headers=headers,

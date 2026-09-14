@@ -36,7 +36,7 @@ export default function Layout() {
             <circle cx="86" cy="24" r="7" fill="var(--color-bull)" />
           </svg>
           <div className="leading-tight">
-            <div className="font-display text-sm font-semibold">Command Center</div>
+            <div className="font-display text-sm font-semibold">DalalSight</div>
             <div className="text-[10px] uppercase tracking-widest text-muted">NSE · BSE · F&amp;O desk</div>
           </div>
         </div>

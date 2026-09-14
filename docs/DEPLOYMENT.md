@@ -45,7 +45,7 @@ Any Ubuntu VPS with 2 GB+ RAM in a Mumbai/Bangalore region.
 
 ```bash
 sudo apt update && sudo apt install -y python3.12 python3.12-venv git caddy
-git clone https://github.com/vikrantsingh07-ai/ai-trading-command-center.git /opt/cc
+git clone https://github.com/vikrantsingh07-ai/dalalsight.git /opt/cc
 cd /opt/cc
 python3.12 -m venv .venv
 .venv/bin/pip install -e packages/tradingagents -e .
@@ -68,7 +68,7 @@ Run it as a service, `/etc/systemd/system/cc.service`:
 
 ```ini
 [Unit]
-Description=AI Trading Command Center
+Description=DalalSight
 After=network-online.target
 
 [Service]
@@ -114,7 +114,7 @@ The container binds `0.0.0.0` and refuses to start without `CC_ACCESS_TOKEN`.
 ## Step 2: deploy the dashboard on Vercel
 
 **Dashboard (easiest):**
-1. vercel.com → **Add New… → Project** → import `vikrantsingh07-ai/ai-trading-command-center`. The repo is private, so allow
+1. vercel.com → **Add New… → Project** → import `vikrantsingh07-ai/dalalsight`. The repo is private, so allow
    the Vercel GitHub app to access it.
 2. **Root Directory:** `web`. The framework (Vite), build command and output come from `web/vercel.json`.
 3. **Environment Variables:**

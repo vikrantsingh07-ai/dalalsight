@@ -1,11 +1,11 @@
 //@version=6
-// Command Center Signal Engine
-// The AI Trading Command Center's rule-based signal model, running on TradingView's own data.
+// DalalSight Signal Engine
+// DalalSight's rule-based signal model, running on TradingView's own data.
 // Each component scores -1..+1 with a configurable weight. Composite S = sum(w*s) / sum(w) over the
 // components that have data; bullish scenario = 50 + 50*S; model confidence = agreeing weight /
 // available weight * data coverage. Weak evidence gives "NO TRADE / WAIT FOR CONFIRMATION".
 // Set alerts to "Once Per Bar Close" so they use completed bars. Research tool, not investment advice.
-indicator("Command Center Signal Engine", shorttitle = "CC Engine", overlay = true, max_labels_count = 200, max_lines_count = 50)
+indicator("DalalSight Signal Engine", shorttitle = "DalalSight", overlay = true, max_labels_count = 200, max_lines_count = 50)
 
 // ---------------------------------------------------------------- inputs
 G_W = "Signal weights"
@@ -348,13 +348,13 @@ if showTable and barstate.islast
     setRow(panel, 17, "Note", "Model estimate, not advice", #8894a5)
 
 // ---------------------------------------------------------------- alerts (use "Once Per Bar Close")
-alertcondition(sigLabel == "BULLISH SETUP" and sigLabel[1] != "BULLISH SETUP", "CC: Bullish setup", "{{ticker}} {{interval}}: BULLISH SETUP at {{close}}")
-alertcondition(sigLabel == "BEARISH SETUP" and sigLabel[1] != "BEARISH SETUP", "CC: Bearish setup", "{{ticker}} {{interval}}: BEARISH SETUP at {{close}}")
-alertcondition(bullConfirm, "CC: EMA bullish crossover confirmed", "{{ticker}} {{interval}}: bullish EMA crossover confirmed at {{close}}")
-alertcondition(bearConfirm, "CC: EMA bearish crossover confirmed", "{{ticker}} {{interval}}: bearish EMA crossover confirmed at {{close}}")
-alertcondition(breakout, "CC: Breakout", "{{ticker}} {{interval}}: breakout above the prior range high at {{close}}")
-alertcondition(breakdown, "CC: Breakdown", "{{ticker}} {{interval}}: breakdown below the prior range low at {{close}}")
-alertcondition(falseBreakout or falseBreakdown, "CC: False breakout or breakdown", "{{ticker}} {{interval}}: possible false breakout at {{close}}")
-alertcondition(volumeSpike, "CC: Volume spike", "{{ticker}} {{interval}}: volume spike at {{close}}")
-alertcondition(not na(nearestSup) and math.abs(low - nearestSup) <= 0.15 * atrVal, "CC: Support test", "{{ticker}} {{interval}}: testing support near {{close}}")
-alertcondition(not na(nearestRes) and math.abs(high - nearestRes) <= 0.15 * atrVal, "CC: Resistance test", "{{ticker}} {{interval}}: testing resistance near {{close}}")
+alertcondition(sigLabel == "BULLISH SETUP" and sigLabel[1] != "BULLISH SETUP", "DalalSight: Bullish setup", "{{ticker}} {{interval}}: BULLISH SETUP at {{close}}")
+alertcondition(sigLabel == "BEARISH SETUP" and sigLabel[1] != "BEARISH SETUP", "DalalSight: Bearish setup", "{{ticker}} {{interval}}: BEARISH SETUP at {{close}}")
+alertcondition(bullConfirm, "DalalSight: EMA bullish crossover confirmed", "{{ticker}} {{interval}}: bullish EMA crossover confirmed at {{close}}")
+alertcondition(bearConfirm, "DalalSight: EMA bearish crossover confirmed", "{{ticker}} {{interval}}: bearish EMA crossover confirmed at {{close}}")
+alertcondition(breakout, "DalalSight: Breakout", "{{ticker}} {{interval}}: breakout above the prior range high at {{close}}")
+alertcondition(breakdown, "DalalSight: Breakdown", "{{ticker}} {{interval}}: breakdown below the prior range low at {{close}}")
+alertcondition(falseBreakout or falseBreakdown, "DalalSight: False breakout or breakdown", "{{ticker}} {{interval}}: possible false breakout at {{close}}")
+alertcondition(volumeSpike, "DalalSight: Volume spike", "{{ticker}} {{interval}}: volume spike at {{close}}")
+alertcondition(not na(nearestSup) and math.abs(low - nearestSup) <= 0.15 * atrVal, "DalalSight: Support test", "{{ticker}} {{interval}}: testing support near {{close}}")
+alertcondition(not na(nearestRes) and math.abs(high - nearestRes) <= 0.15 * atrVal, "DalalSight: Resistance test", "{{ticker}} {{interval}}: testing resistance near {{close}}")

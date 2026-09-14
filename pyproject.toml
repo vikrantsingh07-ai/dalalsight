@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "trading-command-center"
+name = "dalalsight"
 version = "0.1.0"
-description = "AI Trading Command Center: Indian-market research dashboard, analysis engines and agent orchestration on TradingAgents India (packages/tradingagents)"
+description = "DalalSight: Indian-market research dashboard, analysis engines and agent orchestration on TradingAgents India (packages/tradingagents)"
 requires-python = ">=3.11"
 dependencies = [
     "tradingagents",  # install from packages/tradingagents: pip install -e packages/tradingagents

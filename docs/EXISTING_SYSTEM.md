@@ -1,9 +1,9 @@
 # Existing system (Phase 1–3 inspection, 2026-09-13)
 
-Two independent applications live under `D:\Crypto Algo`. The Command Center builds on the
+Two independent applications live under `D:\DalalSight`. DalalSight builds on the
 second one and must not break either.
 
-## 1. Momentum Bot (crypto) — `D:\Crypto Algo`
+## 1. Momentum Bot (crypto) — `D:\DalalSight`
 
 | Area | What exists |
 |---|---|
@@ -14,10 +14,10 @@ second one and must not break either.
 | Ports | backend 8000, Vite dev 5173 |
 | Tests | `pytest bot/tests` → **94 passed** |
 
-The Command Center does not modify this app. It reuses the same frontend stack for consistency
+DalalSight does not modify this app. It reuses the same frontend stack for consistency
 and runs on a different port (8765).
 
-## 2. TradingAgents (multi-agent LLM system) — `D:\Crypto Algo\TradingAgents`
+## 2. TradingAgents (multi-agent LLM system) — `D:\DalalSight\TradingAgents`
 
 TauricResearch TradingAgents (LangGraph), locally extended for Indian markets
 (`tradingagents/dataflows/india/`). Pipeline:
@@ -61,14 +61,14 @@ minutes on free NVIDIA models.
 | B4 | Quarterly cash flow returns NO_DATA for RELIANCE, HDFCBANK | Yahoo publishes only annual cash flow for many Indian companies | **Fixed**: annual fallback with an explicit note; tested |
 | B5 | Agents misread FII/DII flows ("DII absorbed <70%" when DII bought 2× FII selling) | LLM arithmetic on raw figures | **Fixed**: tool output states combined net and the computed coverage ratio; tested |
 | B6 | Researchers/managers invented statistics not present in any tool output | prompts do not forbid external numbers | **Fixed**: `EVIDENCE_RULE` in bull/bear/research-manager/portfolio-manager prompts; tested |
-| B7 | Ultra 550B model failures abort runs | provider overload returned in response body, not retried | **Fixed**: transient upstream errors retried in `NormalizedChatOpenAI`; Command Center model manager adds cooldown + fallback; tested |
+| B7 | Ultra 550B model failures abort runs | provider overload returned in response body, not retried | **Fixed**: transient upstream errors retried in `NormalizedChatOpenAI`; DalalSight model manager adds cooldown + fallback; tested |
 | B8 | CLI OpenRouter picker never lists NVIDIA models | picker whitelists mainstream namespaces | **Fixed**: `TRADINGAGENTS_LLM_PROVIDER` / `QUICK_THINK_LLM` / `DEEP_THINK_LLM` set in `TradingAgents/.env` |
 | L1 | Index VWAP / volume analysis impossible from free data | spot indices carry no volume; intraday futures need a broker feed | **Handled**: components reported "Data unavailable"; broker provider slots name the credentials |
 | L2 | BSE numeric scrip codes (e.g. `500325.BO`) stale on Yahoo | Yahoo feed | documented; use NSE symbols |
 
 TradingAgents test suite after the fixes: **783 passed, 2 skipped**.
 
-## 4. Bugs found and fixed while building the Command Center
+## 4. Bugs found and fixed while building DalalSight
 
 | Bug | Root cause | Fix |
 |---|---|---|

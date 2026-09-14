@@ -90,7 +90,7 @@ class EnvConfig:
 
     @classmethod
     def from_env(cls) -> EnvConfig:
-        db_path = Path(_env("CC_DB_PATH", "data/command_center.db"))
+        db_path = Path(_env("CC_DB_PATH", "data/dalalsight.db"))
         if not db_path.is_absolute():
             db_path = PROJECT_ROOT / db_path
         execution_mode = _env("EXECUTION_MODE", "analysis").lower()

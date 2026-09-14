@@ -1,6 +1,6 @@
-# AI Trading Command Center
+# DalalSight
 
-A research and decision-support platform for Indian markets (NSE/BSE indices, stocks, F&O). It combines:
+**AI trading command center for Indian markets.** A research and decision-support platform for Indian markets (NSE/BSE indices, stocks, F&O). It combines:
 - a live analysis dashboard
 - transparent signal, options and risk engines
 - **TradingAgents India**, a team of LLM analysts, with their bull/bear debate and portfolio decision
@@ -22,7 +22,7 @@ It is one repository with one Python environment.
 | Container | `Dockerfile` | API + built dashboard in one image for an always-on backend host |
 
 ```text
-ai-trading-command-center/
+dalalsight/
 ├── backend/
 │   ├── cc/
 │   │   ├── api/            FastAPI app, routes, security, service container
@@ -35,7 +35,7 @@ ai-trading-command-center/
 │   └── tests/              offline tests (fake providers)
 ├── web/                    dashboard (Vite) + vercel.json
 ├── packages/tradingagents/ multi-agent LLM engine (India edition)
-├── tradingview/            command_center_signal_engine.pine
+├── tradingview/            dalalsight_signal_engine.pine
 ├── docs/
 ├── Dockerfile
 ├── .env.example
@@ -45,8 +45,8 @@ ai-trading-command-center/
 ## Quick start (Windows)
 
 ```bash
-git clone https://github.com/vikrantsingh07-ai/ai-trading-command-center.git
-cd ai-trading-command-center
+git clone https://github.com/vikrantsingh07-ai/dalalsight.git
+cd dalalsight
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e packages/tradingagents -e ".[dev]"
 cd web && npm ci && npm run build && cd ..
@@ -106,7 +106,7 @@ Copy `.env.example` to `.env`; process environment variables always win. Secrets
 | `CC_ACCESS_TOKEN` | token for API + WebSocket; **required** when not bound to localhost | empty |
 | `CC_CORS_ORIGINS` | dashboard origins allowed cross-origin (e.g. your Vercel URL) | empty |
 | `CC_DEV_MODE` | allow the Vite dev server origin | `true` |
-| `CC_DB_PATH` | SQLite file | `data/command_center.db` |
+| `CC_DB_PATH` | SQLite file | `data/dalalsight.db` |
 | `AI_PROVIDER`, `AI_BASE_URL`, `AI_API_KEY` / `AI_API_KEY_ENV` | OpenAI-compatible provider | `openrouter`, OpenRouter URL, `OPENROUTER_API_KEY` |
 | `DEFAULT_AI_MODEL`, `FALLBACK_AI_MODEL` | preferred / fallback models | NVIDIA Nemotron 550B / 120B (free) |
 | `AI_TIMEOUT_SECONDS`, `AI_DAILY_CALL_BUDGET`, `AI_MODEL_COOLDOWN_SECONDS` | call limits | `120`, `45`, `600` |
@@ -131,16 +131,16 @@ are validated and stored in SQLite.
 
 ## TradingView indicator
 
-`tradingview/command_center_signal_engine.pine` is also served at `/api/tradingview/pine` and copyable from the Dashboard.
+`tradingview/dalalsight_signal_engine.pine` is also served at `/api/tradingview/pine` and copyable from the Dashboard.
 
 1. TradingView app → Pine Editor → Open → New indicator → paste → Save → Add to chart.
 2. Use futures charts (`NSE:NIFTY1!`, `NSE:BANKNIFTY1!`) for the volume and VWAP components.
-3. Alerts → Create → Condition "CC Engine" → e.g. "CC: Bullish setup" → "Once per bar close".
+3. Alerts → Create → Condition "DalalSight" → e.g. "DalalSight: Bullish setup" → "Once per bar close".
 
 ## Tests and checks
 
 ```bash
-.venv/Scripts/python.exe -m pytest                                  # Command Center backend (offline)
+.venv/Scripts/python.exe -m pytest                                  # DalalSight backend (offline)
 .venv/Scripts/python.exe -m ruff check backend
 .venv/Scripts/python.exe -m mypy
 cd web && npm run build && npx oxlint                               # type-check, bundle, lint

@@ -1,4 +1,4 @@
-"""Start the Command Center: ``python -m cc`` (from the ``backend`` directory or with the package installed)."""
+"""Start DalalSight: ``python -m cc`` (from the ``backend`` directory or with the package installed)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-# How the AI Trading Command Center works
+# How DalalSight works
 
 This walks through the system from the moment the server starts to what you see on screen. File paths are relative to
 the repository root.
@@ -149,7 +149,7 @@ flowchart LR
 ```
 
 Its India data tools read NSE/BSE prices and index history, F&O bhavcopies and option chains, FII/DII flows, delivery
-data, corporate events and Google News India. The Command Center uses the five analysts. The `tradingagents` CLI runs
+data, corporate events and Google News India. DalalSight uses the five analysts. The `tradingagents` CLI runs
 the whole pipeline and writes a report.
 
 ## 8. Safety rails
@@ -180,7 +180,7 @@ SQLite in WAL mode with versioned migrations. Tables:
   holds the active symbol, timeframe, settings and status.
 - **Hosting:** when the dashboard is hosted apart from the API (Vercel), `VITE_API_BASE_URL` and optionally `VITE_WS_URL` point it
   at the backend. See [DEPLOYMENT.md](DEPLOYMENT.md).
-- **Charts:** charts open in TradingView through links. `tradingview/command_center_signal_engine.pine` mirrors the signal engine on
+- **Charts:** charts open in TradingView through links. `tradingview/dalalsight_signal_engine.pine` mirrors the signal engine on
   your TradingView chart. Option data isn't available in Pine, so that weight counts as unavailable there.
 
 ## 11. API map

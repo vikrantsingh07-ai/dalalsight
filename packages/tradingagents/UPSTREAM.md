@@ -1,7 +1,7 @@
 # TradingAgents India — upstream and changes
 
 This folder is a vendored copy of [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)
-(Apache License 2.0, see `LICENSE`), extended for Indian markets. The Command Center imports it as the
+(Apache License 2.0, see `LICENSE`), extended for Indian markets. DalalSight imports it as the
 `tradingagents` Python package:
 
 ```bash
@@ -52,4 +52,4 @@ tradingagents                             # interactive CLI; set TRADINGAGENTS_M
 ## Updating from upstream
 
 Diff a fresh upstream checkout against `be952b8`, then apply the relevant changes here and run the tests above plus
-the Command Center tests (`python -m pytest` from the repository root).
+DalalSight tests (`python -m pytest` from the repository root).

@@ -1,3 +1,3 @@
-"""AI Trading Command Center backend."""
+"""DalalSight backend."""
 
 __version__ = "0.1.0"

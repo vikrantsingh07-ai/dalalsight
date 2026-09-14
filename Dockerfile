@@ -1,6 +1,6 @@
-# Command Center API + built dashboard in one container, for a backend host such as Render, Railway, Fly.io or a VPS.
-#   docker build -t ai-trading-command-center .
-#   docker run -p 8765:8765 --env-file .env -e CC_ACCESS_TOKEN=<long random string> -v cc-data:/app/data ai-trading-command-center
+# DalalSight API + built dashboard in one container, for a backend host such as Render, Railway, Fly.io or a VPS.
+#   docker build -t dalalsight .
+#   docker run -p 8765:8765 --env-file .env -e CC_ACCESS_TOKEN=<long random string> -v cc-data:/app/data dalalsight
 # The server refuses to listen on 0.0.0.0 without CC_ACCESS_TOKEN. Hosts that set PORT are honoured.
 
 FROM node:22-slim AS web
