@@ -57,15 +57,26 @@ def create_app(env: EnvConfig | None = None, services: Services | None = None, s
         loop = asyncio.get_running_loop()
         loop.set_exception_handler(_quiet_connection_resets)
         services.bus.bind_loop(loop)
-        task = None
+        tasks: list[asyncio.Task] = []
+        log_handler: logging.Handler | None = None
         if start_background:
-            task = asyncio.create_task(services.monitor.run())
-            services.timeline.add("system", f"DalalSight v{__version__} started on http://{env.host}:{env.port}")
+            from ..storage.log_store import DatabaseLogHandler
+
+            # Log records are stored too, so they are copied to Supabase with the rest of the data.
+            log_handler = DatabaseLogHandler(services.db)
+            logging.getLogger().addHandler(log_handler)
+            tasks.append(asyncio.create_task(services.monitor.run()))
+            if services.sync.configured:
+                tasks.append(asyncio.create_task(services.sync.run()))
+            services.timeline.add("system", f"DalalSight v{__version__} started on http://{env.host}:{env.port}"
+                                  + ("; copying data and logs to Supabase" if services.sync.configured else ""))
         yield
-        if task:
+        for task in tasks:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+        if log_handler:
+            logging.getLogger().removeHandler(log_handler)
 
     app = FastAPI(title="DalalSight", version=__version__, lifespan=lifespan, docs_url="/api/docs",
                   openapi_url="/api/openapi.json")

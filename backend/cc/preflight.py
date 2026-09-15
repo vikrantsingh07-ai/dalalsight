@@ -135,8 +135,33 @@ def network_checks(env: EnvConfig) -> list[Check]:
     return checks
 
 
+def supabase_checks(env: EnvConfig, network: bool) -> list[Check]:
+    """The cloud copy of all data and logs (services/supabase_sync.py)."""
+    if not env.supabase_url and not env.supabase_secret_key:
+        return [Check(WARN, "Supabase sync", "off: set SUPABASE_URL and SUPABASE_SECRET_KEY to copy data and logs to Supabase")]
+    missing = [name for name, value in (("SUPABASE_URL", env.supabase_url), ("SUPABASE_SECRET_KEY", env.supabase_secret_key)) if not value]
+    if missing:
+        return [Check(FAIL, "Supabase sync", f"{' and '.join(missing)} is empty")]
+    if not network:
+        return [Check(PASS, "Supabase sync", "configured")]
+    import requests
+
+    from .services.supabase_sync import supabase_headers
+
+    try:
+        response = requests.get(f"{env.supabase_url.rstrip('/')}/rest/v1/settings", params={"select": "key", "limit": "1"},
+                                headers=supabase_headers(env.supabase_secret_key), timeout=15)
+    except requests.RequestException as exc:
+        return [Check(FAIL, "Supabase sync", f"cannot reach {env.supabase_url}: {type(exc).__name__}")]
+    if response.status_code == 200:
+        return [Check(PASS, "Supabase sync", f"{env.supabase_url} reachable, tables present")]
+    if response.status_code in (401, 403):
+        return [Check(FAIL, "Supabase sync", "the key was refused: use the project's secret key (sb_secret_…), not the publishable one")]
+    return [Check(FAIL, "Supabase sync", f"HTTP {response.status_code}: {response.text[:160]}")]
+
+
 def run(env: EnvConfig, network: bool = True) -> int:
-    checks = config_checks(env) + (network_checks(env) if network else [])
+    checks = config_checks(env) + supabase_checks(env, network) + (network_checks(env) if network else [])
     width = max(len(check.name) for check in checks)
     print(f"DalalSight preflight - {env.host}:{env.port}" + (" (server mode)" if server_mode(env) else " (local mode)"))
     for check in checks:

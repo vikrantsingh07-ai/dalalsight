@@ -17,8 +17,9 @@ CORE = {"Database", "Market data provider", "Market monitor"}
 
 class HealthService:
     def __init__(self, env: EnvConfig, db, provider, models, bus, monitor, settings_store, timeline, started_at: datetime,
-                 registry=None):
+                 registry=None, sync=None):
         self.registry = registry
+        self.sync = sync
         self.env = env
         self.db = db
         self.provider = provider
@@ -38,6 +39,16 @@ class HealthService:
         uptime = now_ist() - self.started_at
         add("API server", "ONLINE", f"v{__version__}, uptime {str(uptime).split('.')[0]}", host=f"{self.env.host}:{self.env.port}")
         add("Database", "ONLINE" if self.db.ping() else "ERROR", str(self.db.path))
+        sync = self.sync.status() if self.sync else None
+        if not sync or not sync["configured"]:
+            add("Supabase sync", "NOT_CONFIGURED", "requires SUPABASE_URL and SUPABASE_SECRET_KEY in .env; data stays in the local database")
+        elif sync["last_error"]:
+            add("Supabase sync", "DEGRADED", f"{sync['pending']} change(s) waiting; last error: {sync['last_error']}", **sync)
+        elif sync["last_success"]:
+            add("Supabase sync", "ONLINE", f"last copy {sync['last_success']}; {sync['pending']} change(s) waiting; "
+                f"{sync['rows_sent']} row(s) sent since start", **sync)
+        else:
+            add("Supabase sync", "DEGRADED", f"first copy not done yet ({sync['pending']} change(s) waiting)", **sync)
 
         ph = self.provider.health()
         add("Market data provider", ph.status, ph.detail, provider=ph.name, capabilities=ph.capabilities)

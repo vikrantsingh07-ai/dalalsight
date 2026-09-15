@@ -68,6 +68,38 @@ MIGRATIONS: list[str] = [
     """,
 ]
 
+# Tables copied to Supabase (services/supabase_sync.py) and their primary keys.
+SYNC_TABLES: dict[str, str] = {
+    "settings": "key", "watchlists": "id", "scanners": "id", "signals": "id", "commentary": "id", "timeline": "id",
+    "alerts": "id", "alert_events": "id", "agent_runs": "id", "llm_usage": "day", "paper_orders": "id", "errors": "id",
+    "chat_messages": "id", "backtests": "id", "option_snapshots": "id", "app_logs": "id",
+}
+
+
+def _sync_migration() -> str:
+    """Log table, plus a queue that triggers fill with the key of every inserted, updated or deleted row.
+
+    Existing rows are queued once, so the first Supabase copy includes everything recorded before the sync existed.
+    """
+    parts = [
+        """
+        CREATE TABLE app_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, level TEXT NOT NULL, logger TEXT NOT NULL,
+            message TEXT NOT NULL, detail TEXT);
+        CREATE INDEX idx_app_logs_ts ON app_logs(ts);
+        CREATE TABLE sync_outbox (seq INTEGER PRIMARY KEY AUTOINCREMENT, tbl TEXT NOT NULL, pk TEXT NOT NULL);
+        """
+    ]
+    for table, pk in SYNC_TABLES.items():
+        for event, row in (("INSERT", "NEW"), ("UPDATE", "NEW"), ("DELETE", "OLD")):
+            parts.append(f"CREATE TRIGGER sync_{table}_{event.lower()} AFTER {event} ON {table} "
+                         f"BEGIN INSERT INTO sync_outbox(tbl, pk) VALUES ('{table}', {row}.{pk}); END;")
+        parts.append(f"INSERT INTO sync_outbox(tbl, pk) SELECT '{table}', {pk} FROM {table};")
+    return "\n".join(parts)
+
+
+MIGRATIONS.append(_sync_migration())
+
 
 def _default(value: Any) -> Any:
     if isinstance(value, (datetime, date)):

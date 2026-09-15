@@ -32,7 +32,10 @@ export interface AppValue {
   dismissToast: (id: number) => void;
   say: (text: string) => void;
   needsToken: boolean;
-  submitToken: (token: string) => void;
+  /** Saves the access token and, when given, the server link (empty = the server that served this page). */
+  submitToken: (token: string, server?: string) => void;
+  /** Backend this dashboard talks to; empty means the same origin. */
+  serverUrl: string;
 }
 
 export const AppContext = createContext<AppValue | null>(null);

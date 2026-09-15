@@ -1,4 +1,4 @@
-import { API_BASE, getToken } from "./api";
+import { BUILT_API_BASE, apiBase, getToken } from "./api";
 
 export interface WsMessage {
   type: string;
@@ -20,9 +20,12 @@ function tokenProtocol(token: string): string {
 
 /** Same origin by default; a dashboard hosted apart from the API (e.g. on Vercel) connects to the API host. */
 function socketUrl(): string {
+  const base = apiBase();
+  const toSocket = (http: string) => `${http.replace(/^http/, "ws")}/ws`;
+  if (base && base !== BUILT_API_BASE) return toSocket(base); // a server link saved in this browser
   const explicit = (import.meta.env.VITE_WS_URL ?? "").trim();
   if (explicit) return explicit;
-  if (API_BASE) return `${API_BASE.replace(/^http/, "ws")}/ws`;
+  if (base) return toSocket(base);
   return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 }
 

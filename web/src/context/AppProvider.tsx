@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { get, put, setToken } from "../lib/api";
+import { apiBase, get, put, setServerUrl, setToken } from "../lib/api";
 import type { ConfigPayload, Settings, StatusPayload } from "../lib/types";
 import { beep, speak } from "../lib/voice";
 import { socket, type SocketState, type WsMessage } from "../lib/ws";
@@ -32,6 +32,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [assistantOpen, setAssistantOpenState] = useState(() => readStored("cc_assistant", "closed") === "open");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [needsToken, setNeedsToken] = useState(false);
+  const [serverUrl, setServerUrlState] = useState(() => apiBase());
   const [authTick, setAuthTick] = useState(0);
   const [statusTick, setStatusTick] = useState(0);
   const settingsRef = useRef<Settings | null>(null);
@@ -91,9 +92,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [authTick, statusTick]);
 
   useEffect(() => {
-    const onUnauthorized = () => setNeedsToken(true);
-    window.addEventListener("cc:unauthorized", onUnauthorized);
-    return () => window.removeEventListener("cc:unauthorized", onUnauthorized);
+    // 401: the server wants the access token. cc:connect: no server link yet, or the saved one can't be reached.
+    const ask = () => setNeedsToken(true);
+    window.addEventListener("cc:unauthorized", ask);
+    window.addEventListener("cc:connect", ask);
+    return () => {
+      window.removeEventListener("cc:unauthorized", ask);
+      window.removeEventListener("cc:connect", ask);
+    };
   }, []);
 
   useEffect(() => socket.onState(setWsState), []);
@@ -146,8 +152,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return next;
   }, []);
 
-  const submitToken = useCallback((token: string) => {
-    setToken(token.trim());
+  const submitToken = useCallback((token: string, server?: string) => {
+    if (server !== undefined) {
+      setServerUrl(server);
+      setServerUrlState(apiBase());
+    }
+    if (token.trim()) setToken(token.trim());
     setNeedsToken(false);
     setAuthTick((value) => value + 1);
     socket.reconnect();
@@ -177,8 +187,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       say,
       needsToken,
       submitToken,
+      serverUrl,
     }),
-    [activeSymbol, setSymbol, activeTimeframe, setTimeframe, status, refreshStatus, config, settings, saveSettings, wsState, voiceOn, setVoiceOn, assistantOpen, setAssistantOpen, toasts, pushToast, dismissToast, say, needsToken, submitToken],
+    [activeSymbol, setSymbol, activeTimeframe, setTimeframe, status, refreshStatus, config, settings, saveSettings, wsState, voiceOn, setVoiceOn, assistantOpen, setAssistantOpen, toasts, pushToast, dismissToast, say, needsToken, submitToken, serverUrl],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

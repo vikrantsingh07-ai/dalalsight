@@ -184,22 +184,33 @@ function Toasts() {
 }
 
 function TokenPrompt() {
-  const { submitToken } = useApp();
+  const { submitToken, serverUrl } = useApp();
+  const [server, setServer] = useState(serverUrl);
   const [token, setTokenValue] = useState("");
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <form
-        className="w-full max-w-sm rounded-lg border border-edge bg-panel p-4"
+        className="w-full max-w-md rounded-lg border border-edge bg-panel p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (token.trim()) submitToken(token);
+          submitToken(token, server);
         }}
       >
-        <h2 className="font-display text-base font-semibold">Access token required</h2>
-        <p className="mt-1 text-xs text-muted">This server has CC_ACCESS_TOKEN set. Enter it to continue; it is stored only in this browser.</p>
-        <Input id="access-token" className="mt-3" type="password" autoFocus value={token} onChange={(event) => setTokenValue(event.target.value)} aria-label="Access token" />
+        <h2 className="font-display text-base font-semibold">Connect to your DalalSight server</h2>
+        <p className="mt-1 text-xs leading-relaxed text-muted">
+          Both are saved only in this browser. Server link: where DalalSight runs, for example your Cloudflare Tunnel link. Leave it empty when this page is opened from the server
+          itself.
+        </p>
+        <label htmlFor="server-link" className="mt-3 block text-xs text-muted">
+          Server link
+        </label>
+        <Input id="server-link" className="mt-1" type="url" placeholder="https://….trycloudflare.com" value={server} onChange={(event) => setServer(event.target.value)} />
+        <label htmlFor="access-token" className="mt-3 block text-xs text-muted">
+          Access token (CC_ACCESS_TOKEN from the server&apos;s .env)
+        </label>
+        <Input id="access-token" className="mt-1" type="password" autoFocus value={token} onChange={(event) => setTokenValue(event.target.value)} />
         <Button type="submit" variant="primary" className="mt-3 w-full">
-          Unlock
+          Connect
         </Button>
       </form>
     </div>

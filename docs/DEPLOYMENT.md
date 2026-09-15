@@ -143,6 +143,71 @@ vercel --prod
 The backend already serves the built dashboard. With Option A, run `cd web && npm ci && npm run build` on the VPS, or
 use the Docker image, which includes `web/dist`. Then open `https://api.yourdomain.com` directly: one URL and no CORS setup.
 
+## Current setup: this PC as the backend + Cloudflare Tunnel + Supabase + Vercel
+
+Chosen on 15 Sep 2026. The backend keeps running on the Windows PC, the dashboard is on Vercel, and every piece of data
+and every log record is also copied to Supabase.
+
+```mermaid
+flowchart LR
+    U[Browser] -->|"https://your-app.vercel.app"| V["Vercel<br/>dashboard"]
+    U -->|"REST + WebSocket + token"| T["Cloudflare Tunnel<br/>https://….trycloudflare.com"]
+    T --> B["This PC<br/>python -m cc"]
+    B --- D[("data/dalalsight.db<br/>SQLite")]
+    B -->|"every 15 s, queued while offline"| S[("Supabase Postgres<br/>Mumbai")]
+```
+
+### 1. Supabase copy of data and logs
+
+The Supabase project `dalalsight` (region `ap-south-1`) already has the tables. They have row-level security on and no
+access for the public API roles, so only the server's secret key can read or write them.
+
+1. Supabase dashboard → the `dalalsight` project → **Project Settings → API Keys** → copy a **secret key** (`sb_secret_…`).
+   Never the publishable key, and never in a `VITE_*` variable.
+2. Add to the root `.env` yourself:
+
+   ```
+   SUPABASE_URL=https://<project-ref>.supabase.co
+   SUPABASE_SECRET_KEY=<the secret key>
+   ```
+3. Restart the backend. `python -m cc --check` shows `Supabase sync … reachable`, and **System Health → Supabase sync**
+   shows ONLINE with the number of rows sent. The first copy includes everything recorded before the sync existed.
+
+How it works: triggers in the local database queue the key of every inserted, updated or deleted row (`sync_outbox`), and
+`services/supabase_sync.py` sends the current rows to Supabase's REST API. Log records (INFO+ from DalalSight, WARNING+
+from libraries) go to the `app_logs` table and are copied the same way. Without internet the app keeps working and the
+queue waits.
+
+### 2. Token and CORS on this PC
+
+Add to `.env` (generate the token yourself, for example in PowerShell:
+`-join ((48..57)+(65..90)+(97..122) | Get-Random -Count 40 | % {[char]$_})`):
+
+```
+CC_ACCESS_TOKEN=<40 random characters>
+CC_DEV_MODE=false
+CC_CORS_ORIGINS=https://your-app.vercel.app
+```
+
+Keep `CC_HOST=127.0.0.1`: the tunnel connects locally, so port 8765 is never opened to the internet.
+
+### 3. Cloudflare Tunnel
+
+```powershell
+winget install --id Cloudflare.cloudflared
+cloudflared tunnel --url http://127.0.0.1:8765
+```
+
+It prints a link like `https://words-words.trycloudflare.com`. This quick tunnel is free and needs no account, but the
+link changes every time it starts and the PC must stay on. For a fixed link, create a named tunnel on your own domain
+in a Cloudflare account.
+
+### 4. Vercel dashboard
+
+Import `vikrantsingh07-ai/dalalsight` with **Root Directory `web`** (see Step 2 above). `VITE_API_BASE_URL` is optional:
+when it is empty, the dashboard shows **Connect to your DalalSight server**; paste the tunnel link and the access token.
+Both are saved in that browser only, so a new tunnel link needs no rebuild.
+
 ## Security checklist
 
 - [ ] HTTPS everywhere (Caddy / platform TLS). Never expose port 8765 directly.

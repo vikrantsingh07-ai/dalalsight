@@ -50,8 +50,36 @@ export function setToken(token: string): void {
   }
 }
 
-/** Backend origin when the dashboard is hosted apart from the API (e.g. on Vercel); empty means same origin. */
-export const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
+const SERVER_KEY = "cc_server_url";
+const clean = (url: string) => url.trim().replace(/\/+$/, "");
+
+/** Backend origin compiled in with VITE_API_BASE_URL (e.g. a dashboard on Vercel); empty means same origin. */
+export const BUILT_API_BASE = clean(import.meta.env.VITE_API_BASE_URL ?? "");
+
+/**
+ * The backend to call. A server link saved in this browser (from the connect prompt) wins over the built-in one, so a
+ * changing Cloudflare Tunnel link needs no rebuild.
+ */
+export function apiBase(): string {
+  try {
+    const saved = clean(localStorage.getItem(SERVER_KEY) ?? "");
+    if (saved) return saved;
+  } catch {
+    /* storage unavailable */
+  }
+  return BUILT_API_BASE;
+}
+
+export function setServerUrl(url: string): void {
+  try {
+    if (clean(url)) localStorage.setItem(SERVER_KEY, clean(url));
+    else localStorage.removeItem(SERVER_KEY);
+  } catch {
+    /* storage unavailable: the link lives only for this page load */
+  }
+}
+
+const askToConnect = () => window.dispatchEvent(new CustomEvent("cc:connect"));
 
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, ...rest } = init;
@@ -63,7 +91,20 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     headers.set("Content-Type", "application/json");
     body = JSON.stringify(json);
   }
-  const response = await fetch(`${API_BASE}${path}`, { ...rest, headers, body });
+  const base = apiBase();
+  let response: Response;
+  try {
+    response = await fetch(`${base}${path}`, { ...rest, headers, body });
+  } catch (error) {
+    // A separately hosted server that can't be reached (tunnel closed, link changed): ask for the link again.
+    if (base) askToConnect();
+    throw error;
+  }
+  if ((response.headers.get("content-type") ?? "").includes("text/html")) {
+    // An HTML page instead of the API: this dashboard is hosted apart (e.g. Vercel) and has no server link yet.
+    askToConnect();
+    throw new ApiError(0, "This address is not a DalalSight server. Enter the server link.");
+  }
   const text = await response.text();
   let data: unknown = null;
   try {

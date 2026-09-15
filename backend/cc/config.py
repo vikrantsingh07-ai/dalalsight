@@ -87,6 +87,10 @@ class EnvConfig:
     alert_email_to: str
     # Origins allowed to call the API cross-origin, e.g. the dashboard deployed on Vercel.
     cors_origins: tuple[str, ...] = ()
+    # Supabase project that receives a copy of all data and logs (services/supabase_sync.py). The key stays server-side.
+    supabase_url: str = ""
+    supabase_secret_key: str = ""
+    supabase_sync_seconds: int = 15
 
     @classmethod
     def from_env(cls) -> EnvConfig:
@@ -126,6 +130,9 @@ class EnvConfig:
             smtp_password=_env("SMTP_PASSWORD"),
             alert_email_from=_env("ALERT_EMAIL_FROM"),
             alert_email_to=_env("ALERT_EMAIL_TO"),
+            supabase_url=_env("SUPABASE_URL"),
+            supabase_secret_key=_env("SUPABASE_SECRET_KEY") or _env("SUPABASE_SERVICE_ROLE_KEY"),
+            supabase_sync_seconds=_env_int("SUPABASE_SYNC_SECONDS", 15),
         )
 
     def ai_api_key(self) -> str:
@@ -142,6 +149,7 @@ class EnvConfig:
     def public(self) -> dict:
         """Non-secret view for the UI and health panel."""
         return {
+            "supabase_sync_configured": bool(self.supabase_url and self.supabase_secret_key),
             "host": self.host,
             "port": self.port,
             "dev_mode": self.dev_mode,

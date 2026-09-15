@@ -178,6 +178,14 @@ SQLite in WAL mode with versioned migrations. Tables:
 - alerts, alert_events
 - agent_runs, llm_usage, chat_messages
 - paper_orders, backtests, option_snapshots
+- app_logs: log records (INFO+ from DalalSight's `cc` loggers, WARNING+ from libraries; `storage/log_store.py`)
+
+**Supabase copy** (`services/supabase_sync.py`, on when `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are set). The local
+database stays the source of truth. Triggers put the key of every inserted, updated or deleted row into `sync_outbox`;
+every `SUPABASE_SYNC_SECONDS` (15) the worker upserts the current rows through Supabase's REST API, converting JSON text
+to `jsonb` and 0/1 flags to booleans, and deletes rows that are gone. A failed request keeps the queue, so nothing is
+lost offline. The Supabase tables mirror the local ones, with RLS on and no access for the public API roles. System
+Health and `python -m cc --check` show the sync state.
 
 ## 10. The dashboard (`web/`)
 

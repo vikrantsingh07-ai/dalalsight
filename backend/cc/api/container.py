@@ -27,6 +27,7 @@ from ..services.paper import PaperService
 from ..services.replay import ReplayService
 from ..services.settings_store import SettingsStore
 from ..services.signals import SignalService
+from ..services.supabase_sync import SupabaseSync
 from ..services.timeline import Timeline
 from ..storage.db import Database
 from .security import RateLimiter
@@ -58,6 +59,7 @@ class Services:
     health: HealthService
     limiter: RateLimiter
     started_at: datetime
+    sync: SupabaseSync
 
 
 def build_services(env: EnvConfig, *, db: Database | None = None, provider: MarketDataProvider | None = None,
@@ -94,8 +96,9 @@ def build_services(env: EnvConfig, *, db: Database | None = None, provider: Mark
     monitor = MonitorService(analysis, options, commentary, alerts, signals, timeline, bus, settings)
     replay = ReplayService(analysis, commentary, bus, timeline, settings)
     backtests = BacktestService(db, analysis, settings, timeline, bus)
+    sync = SupabaseSync(env, db)
     started_at = now_ist()
-    health = HealthService(env, db, provider, models, bus, monitor, settings_store, timeline, started_at, registry)
+    health = HealthService(env, db, provider, models, bus, monitor, settings_store, timeline, started_at, registry, sync)
     return Services(env, db, bus, cache, registry, provider, settings_store, timeline, models, analysis, options, stocks,
                     commentary, alerts, signals, paper, orchestrator, assistant, monitor, replay, backtests, health, RateLimiter(),
-                    started_at)
+                    started_at, sync)
