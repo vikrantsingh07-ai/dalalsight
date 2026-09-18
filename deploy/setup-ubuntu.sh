@@ -33,7 +33,7 @@ python3.12 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install -e "$APP_DIR/packages/tradingagents" -e "$APP_DIR"
 
 echo "==> Server settings in $ENV_FILE"
-[[ -f "$ENV_FILE" ]] || cp "$APP_DIR/.env.example" "$ENV_FILE"
+[[ -f "$ENV_FILE" ]] || touch "$ENV_FILE"
 set_env() {  # set KEY=VALUE in .env, replacing an existing line
   local key="$1" value="$2"
   if grep -qE "^${key}=" "$ENV_FILE"; then

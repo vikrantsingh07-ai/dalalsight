@@ -39,7 +39,6 @@ dalalsight/
 ├── tradingview/            dalalsight_signal_engine.pine
 ├── docs/
 ├── Dockerfile
-├── .env.example
 └── pyproject.toml
 ```
 
@@ -51,10 +50,9 @@ cd dalalsight
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -e packages/tradingagents -e ".[dev]"
 cd web && npm ci && npm run build && cd ..
-copy .env.example .env
 ```
 
-Put your `OPENROUTER_API_KEY` in `.env`, then start:
+Create `.env` in this folder (see **Environment variables** below) with at least `OPENROUTER_API_KEY`, then start:
 
 ```bash
 .venv/Scripts/python.exe -m cc
@@ -101,7 +99,8 @@ Functions don't support that. Use a VPS or a Docker host with `CC_ACCESS_TOKEN` 
 
 ## Environment variables
 
-Copy `.env.example` to `.env`; process environment variables always win. Secrets never reach the browser.
+All config lives in one `.env` file in this folder (git-ignored). Process environment variables always win. Secrets
+never reach the browser.
 
 | Variable | Purpose | Default |
 |---|---|---|
@@ -110,6 +109,7 @@ Copy `.env.example` to `.env`; process environment variables always win. Secrets
 | `CC_CORS_ORIGINS` | dashboard origins allowed cross-origin (e.g. your Vercel URL) | empty |
 | `CC_DEV_MODE` | allow the Vite dev server origin | `true` |
 | `CC_DB_PATH` | SQLite file | `data/dalalsight.db` |
+| `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_SYNC_SECONDS` | cloud copy of all data and logs (optional) | empty (off) |
 | `AI_PROVIDER`, `AI_BASE_URL`, `AI_API_KEY` / `AI_API_KEY_ENV` | OpenAI-compatible provider | `openrouter`, OpenRouter URL, `OPENROUTER_API_KEY` |
 | `DEFAULT_AI_MODEL`, `FALLBACK_AI_MODEL` | preferred / fallback models | NVIDIA Nemotron 550B / 120B (free) |
 | `AI_TIMEOUT_SECONDS`, `AI_DAILY_CALL_BUDGET`, `AI_MODEL_COOLDOWN_SECONDS` | call limits | `120`, `45`, `600` |
