@@ -62,6 +62,9 @@ class EnvConfig:
     db_path: Path
     dev_mode: bool
     access_token: str
+    # A second, low-privilege token for the automated QA/paper-trading routine (security.qa_scope_allows): never
+    # the full access_token. Optional; leave empty to keep that routine limited to reading the repo.
+    qa_token: str
     ai_provider: str
     ai_base_url: str
     ai_api_key_env: str
@@ -107,6 +110,7 @@ class EnvConfig:
             dev_mode=_env_bool("CC_DEV_MODE", True),
             cors_origins=tuple(origin.strip().rstrip("/") for origin in _env("CC_CORS_ORIGINS").split(",") if origin.strip()),
             access_token=_env("CC_ACCESS_TOKEN"),
+            qa_token=_env("CC_QA_TOKEN"),
             ai_provider=_env("AI_PROVIDER", "openrouter").lower(),
             ai_base_url=_env("AI_BASE_URL", "https://openrouter.ai/api/v1"),
             ai_api_key_env=_env("AI_API_KEY_ENV", "OPENROUTER_API_KEY"),
@@ -154,6 +158,7 @@ class EnvConfig:
             "port": self.port,
             "dev_mode": self.dev_mode,
             "access_token_required": bool(self.access_token),
+            "qa_token_configured": bool(self.qa_token),
             "ai_provider": self.ai_provider,
             "ai_base_url": self.ai_base_url,
             "ai_key_configured": bool(self.ai_api_key()),

@@ -22,7 +22,7 @@ from ..data.models import DataUnavailable
 from ..services.paper import ExecutionRefused
 from .container import Services, build_services
 from .routes import router
-from .security import respond, sanitize, token_ok
+from .security import qa_scope_allows, respond, sanitize, token_ok
 
 log = logging.getLogger("cc")
 DIST = PROJECT_ROOT / "web" / "dist"
@@ -89,7 +89,13 @@ def create_app(env: EnvConfig | None = None, services: Services | None = None, s
         if env.access_token and path.startswith("/api"):
             provided = request.headers.get("x-access-token") or request.headers.get("authorization", "").removeprefix("Bearer ").strip()
             if not token_ok(env.access_token, provided):
-                return respond({"detail": "access token required"}, 401)
+                qa_ok = env.qa_token and token_ok(env.qa_token, provided)
+                if qa_ok and qa_scope_allows(request.method, path):
+                    pass
+                elif qa_ok:
+                    return respond({"detail": "this token cannot call this endpoint"}, 403)
+                else:
+                    return respond({"detail": "access token required"}, 401)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"

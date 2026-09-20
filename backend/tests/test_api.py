@@ -201,6 +201,28 @@ def test_access_token_protects_api_and_websocket(registry, provider):
             assert ws.receive_json()["type"] == "hello"
 
 
+def test_qa_token_is_limited_to_its_own_scope(registry, provider):
+    services = build_services(make_env(access_token="tok-123", qa_token="qa-456"), db=Database(":memory:"), provider=provider,
+                              registry=registry, adapter_factory=FakeAdapter)
+    services.settings_store.update({"execution_mode": "paper"})
+    with TestClient(create_app(services=services, start_background=False)) as c:
+        qa = {"X-Access-Token": "qa-456"}
+        # allowed: reads, and the specific writes a QA/paper-trading routine needs
+        assert c.get("/api/status", headers=qa).status_code == 200
+        assert c.get("/api/analysis/NIFTY?timeframe=5m", headers=qa).status_code == 200
+        order = c.post("/api/paper/orders", json={"symbol": "NIFTY", "side": "BUY", "quantity": 65}, headers=qa)
+        assert order.status_code == 201 and order.json()["mode"] == "PAPER"
+        assert c.get("/api/paper/positions", headers=qa).status_code == 200
+        # refused: anything that spends the AI budget or changes persistent config
+        assert c.put("/api/settings", json={"default_symbol": "SENSEX"}, headers=qa).status_code == 403
+        assert c.post("/api/agents/run", json={"symbol": "NIFTY", "timeframe": "5m"}, headers=qa).status_code == 403
+        assert c.post("/api/alerts/test", json={"symbol": "NIFTY"}, headers=qa).status_code == 403
+        # the full token still works for everything, even with a QA token also configured
+        assert c.put("/api/settings", json={"default_symbol": "SENSEX"}, headers={"X-Access-Token": "tok-123"}).status_code == 200
+        # a wrong token is still just refused, not upgraded to QA scope
+        assert c.get("/api/status", headers={"X-Access-Token": "wrong"}).status_code == 401
+
+
 def test_broker_provider_reports_required_credentials(registry):
     broker = BrokerFeedProvider("kite", registry)
     with pytest.raises(DataUnavailable) as info:

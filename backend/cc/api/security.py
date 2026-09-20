@@ -42,6 +42,34 @@ def token_ok(expected: str, provided: str | None) -> bool:
     return hmac.compare_digest(expected.encode(), provided.encode())
 
 
+# Endpoints the low-privilege QA token may call (config.EnvConfig.qa_token) — for the scheduled QA/paper-trading
+# routine (docs/DEPLOYMENT.md), which must never hold the full CC_ACCESS_TOKEN. Read-only information, plus the
+# handful of writes needed to actually use the app: paper trading, scanner/strategy/hedge analysis, and closing
+# out recorded signals. Deliberately excludes anything that spends the AI call budget (agents, assistant),
+# changes persistent config (settings, alerts), or could surprise the human user (a test alert send, replay mode,
+# a new backtest job). Paths are matched without the "/api" prefix.
+QA_TOKEN_GET_EXACT = frozenset({
+    "/status", "/config", "/symbols/search", "/quotes", "/overview", "/strategies/suggest", "/commentary",
+    "/agents/meta", "/agents/runs", "/alerts", "/alerts/events", "/signals", "/signals/stats",
+    "/paper/orders", "/paper/positions", "/backtest", "/timeline", "/errors", "/health", "/replay/status",
+    "/tradingview/pine",
+})
+QA_TOKEN_GET_PREFIX = (
+    "/instrument/", "/chart/", "/analysis/", "/options/", "/stocks/", "/agents/runs/", "/signals/history/",
+    "/backtest/", "/calibration/",
+)
+QA_TOKEN_POST_EXACT = frozenset({"/signals/evaluate", "/paper/orders", "/scanner/run", "/strategies/build", "/hedging/analyze"})
+
+
+def qa_scope_allows(method: str, path: str) -> bool:
+    route = path.removeprefix("/api")
+    if method == "GET":
+        return route in QA_TOKEN_GET_EXACT or route.startswith(QA_TOKEN_GET_PREFIX)
+    if method == "POST":
+        return route in QA_TOKEN_POST_EXACT
+    return False
+
+
 def sanitize(value: Any) -> Any:
     if isinstance(value, float):
         return value if math.isfinite(value) else None

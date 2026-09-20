@@ -239,8 +239,16 @@ every NSE trading day (9:30, 11:30, 13:30, 15:30 IST) as a genuinely separate Cl
 runs. Each time it: finds the live deployment via the same Supabase `endpoints` lookup, reviews a rotating slice of
 the app from both a user's and a developer's angle, writes findings to `docs/qa-log/<date>.md`, and opens a pull
 request for any small, well-tested, low-risk fix it's confident about (never pushes app-code changes to `main`
-directly). It cannot call authenticated `/api/*` routes (no access token by design) — see the routine's prompt for
-the exact scope and hard rules (paper trading only, no fabricated data, no secrets).
+directly). It calls authenticated `/api/*` routes only if `CC_QA_TOKEN` has been wired up (below) — see the routine's
+prompt for the exact scope and hard rules (paper trading only, no fabricated data, no secrets).
+
+**Giving it real (paper) access, optionally:** the backend supports a second, low-privilege `CC_QA_TOKEN`
+(`api/security.py`, `qa_scope_allows`) limited to reads plus paper orders / scanner / strategy / hedge builders —
+never settings, alerts, or anything that spends the AI budget. Generate one yourself the same way as
+`CC_ACCESS_TOKEN` and add `CC_QA_TOKEN=...` to `.env`, restart. The routine still needs that same value to send as
+its `X-Access-Token` header; how to get it there without anyone (Claude included) typing a secret into the
+routine's stored prompt/config is an open question — check whether https://claude.ai/code/routines lets you set an
+environment variable on the routine directly, or ask Claude to work through it with you.
 
 ## Security checklist
 

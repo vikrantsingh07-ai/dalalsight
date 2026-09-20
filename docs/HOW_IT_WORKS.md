@@ -167,6 +167,12 @@ the whole pipeline and writes a report.
   - Keys live only in the backend `.env`. `EnvConfig.public()` reports only whether a key is set.
   - `CC_ACCESS_TOKEN` protects REST (the `X-Access-Token` header) and the WebSocket (sent as a subprotocol, never in the URL).
     It also guards `/api/docs` and `/api/openapi.json`, so a public server doesn't publish its API map.
+  - `CC_QA_TOKEN` (optional) is a second, low-privilege token for the daily automated QA/paper-trading routine
+    (`docs/DEPLOYMENT.md` step 6). `security.qa_scope_allows` limits it to read-only endpoints plus paper orders,
+    the scanner/strategy/hedge builders, and closing out recorded signals — never `/api/settings`, `/api/alerts`
+    writes, `/api/agents/run` or `/api/assistant/chat` (spends the AI budget), or anything that starts a new
+    backtest or replay. A request presenting neither token is refused (401); the QA token outside its scope is
+    refused (403), never silently upgraded.
 - **Limits and input:** expensive endpoints are rate limited. Inputs are validated with pydantic.
 - **Data honesty:** no fabricated data. Unavailable feeds are reported as unavailable, and AI numbers are cross-checked.
 

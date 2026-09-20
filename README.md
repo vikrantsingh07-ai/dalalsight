@@ -106,6 +106,7 @@ never reach the browser.
 |---|---|---|
 | `CC_HOST`, `CC_PORT` (or `PORT`) | bind address | `127.0.0.1`, `8765` |
 | `CC_ACCESS_TOKEN` | token for API + WebSocket; **required** when not bound to localhost | empty |
+| `CC_QA_TOKEN` | second, low-privilege token for the automated QA/paper-trading routine (`api/security.py` `qa_scope_allows`: reads + paper orders only, never settings/alerts/AI runs) | empty (off) |
 | `CC_CORS_ORIGINS` | dashboard origins allowed cross-origin (e.g. your Vercel URL) | empty |
 | `CC_DEV_MODE` | allow the Vite dev server origin | `true` |
 | `CC_DB_PATH` | SQLite file | `data/dalalsight.db` |

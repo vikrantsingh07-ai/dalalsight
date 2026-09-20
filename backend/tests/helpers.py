@@ -41,7 +41,7 @@ TF_MINUTES = {"1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 2
 
 def make_env(**overrides) -> EnvConfig:
     base = EnvConfig(
-        host="127.0.0.1", port=8765, db_path=Path(":memory:"), dev_mode=False, access_token="", ai_provider="openrouter",
+        host="127.0.0.1", port=8765, db_path=Path(":memory:"), dev_mode=False, access_token="", qa_token="", ai_provider="openrouter",
         ai_base_url="http://ai.invalid/api/v1", ai_api_key_env="CC_TEST_AI_KEY", default_ai_model="test/default-550b",
         fallback_ai_model="test/fallback-120b", ai_timeout_seconds=5, ai_daily_call_budget=10, ai_model_cooldown_seconds=60,
         market_data_provider="public", option_data_provider="nse", execution_mode="analysis", live_execution_enabled=False,
