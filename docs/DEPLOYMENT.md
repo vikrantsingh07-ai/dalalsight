@@ -208,6 +208,40 @@ Import `vikrantsingh07-ai/dalalsight` with **Root Directory `web`** (see Step 2 
 when it is empty, the dashboard shows **Connect to your DalalSight server**; paste the tunnel link and the access token.
 Both are saved in that browser only, so a new tunnel link needs no rebuild.
 
+### 5. Keep it running: Windows auto-start + auto-restart
+
+A quick tunnel has no fixed hostname (a new `https://*.trycloudflare.com` link every time it restarts), and neither
+process survives a PC reboot or logout on its own. `deploy/windows/` solves both:
+
+- `run-backend-loop.ps1` / `run-tunnel-loop.ps1` — each is an infinite loop that restarts its process 5 s after any
+  exit (crash, or you stopping it for a moment). Logs to `data/backend-loop.log` / `data/tunnel-loop.log`.
+- The tunnel loop also **publishes its current URL to Supabase** (table `public.endpoints`, row `id = "backend"`,
+  `url = <the current link>`) every time it gets a new one, using `SUPABASE_URL` / `SUPABASE_SECRET_KEY` from `.env`.
+  That table allows anonymous **read** only (the URL isn't a secret; nothing else is), so both the dashboard
+  (`web/src/lib/api.ts`, `discoverServerUrl`) and the daily QA routine (below) find the live backend automatically —
+  no one needs to re-paste a link after a restart. Requires the `endpoints` table to exist (one-time SQL, see the
+  migration in `services/supabase_sync.py`'s history, or ask Claude to (re)apply it).
+- `setup-windows.ps1` — run once, no admin needed, to make both loops start automatically at every Windows login
+  (via a `.cmd` in your Startup folder — Task Scheduler was tried first but is blocked on this account). Run it
+  yourself in a normal PowerShell window:
+  ```powershell
+  D:\DalaSight\command_center\deploy\windows\setup-windows.ps1
+  ```
+  It also prints two `Start-Process` lines to start both loops immediately, without waiting for the next login.
+
+This keeps DalalSight up as long as the PC is on and you're logged in, with auto-restart on any crash — the practical
+ceiling without paying for a VPS (Option A above removes even that dependency, at a small monthly cost).
+
+### 6. Daily automated QA + paper trading
+
+A scheduled cloud routine ("DalalSight daily QA & paper trading", https://claude.ai/code/routines) runs four times on
+every NSE trading day (9:30, 11:30, 13:30, 15:30 IST) as a genuinely separate Claude session with no memory between
+runs. Each time it: finds the live deployment via the same Supabase `endpoints` lookup, reviews a rotating slice of
+the app from both a user's and a developer's angle, writes findings to `docs/qa-log/<date>.md`, and opens a pull
+request for any small, well-tested, low-risk fix it's confident about (never pushes app-code changes to `main`
+directly). It cannot call authenticated `/api/*` routes (no access token by design) — see the routine's prompt for
+the exact scope and hard rules (paper trading only, no fabricated data, no secrets).
+
 ## Security checklist
 
 - [ ] HTTPS everywhere (Caddy / platform TLS). Never expose port 8765 directly.

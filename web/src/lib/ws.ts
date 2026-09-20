@@ -1,4 +1,4 @@
-import { BUILT_API_BASE, apiBase, getToken } from "./api";
+import { BUILT_API_BASE, apiBase, discoverServerUrl, getToken } from "./api";
 
 export interface WsMessage {
   type: string;
@@ -66,6 +66,9 @@ class DashboardSocket {
       if (this.socket !== socket) return;
       this.socket = null;
       this.setState("closed");
+      // A few retries against a stale link (e.g. the tunnel restarted with a new hostname) are expected; look up
+      // the current one from Supabase before the next attempt, same as the REST layer.
+      if (this.retries >= 2) void discoverServerUrl();
       const delay = Math.min(30_000, 1000 * 2 ** this.retries++);
       this.retryTimer = window.setTimeout(() => this.connect(), delay);
     };

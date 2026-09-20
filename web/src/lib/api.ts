@@ -51,23 +51,35 @@ export function setToken(token: string): void {
 }
 
 const SERVER_KEY = "cc_server_url";
+const DISCOVERED_KEY = "cc_discovered_server_url";
 const clean = (url: string) => url.trim().replace(/\/+$/, "");
 
 /** Backend origin compiled in with VITE_API_BASE_URL (e.g. a dashboard on Vercel); empty means same origin. */
 export const BUILT_API_BASE = clean(import.meta.env.VITE_API_BASE_URL ?? "");
 
+function savedServerUrl(): string {
+  try {
+    return clean(localStorage.getItem(SERVER_KEY) ?? "");
+  } catch {
+    return "";
+  }
+}
+
+function discoveredServerUrl(): string {
+  try {
+    return clean(localStorage.getItem(DISCOVERED_KEY) ?? "");
+  } catch {
+    return "";
+  }
+}
+
 /**
- * The backend to call. A server link saved in this browser (from the connect prompt) wins over the built-in one, so a
- * changing Cloudflare Tunnel link needs no rebuild.
+ * The backend to call, in order: a server link saved in this browser (from the connect prompt) — always wins, so a
+ * link you pasted yourself is never silently replaced; then one auto-discovered from Supabase (see
+ * `discoverServerUrl`); then the one compiled in with VITE_API_BASE_URL.
  */
 export function apiBase(): string {
-  try {
-    const saved = clean(localStorage.getItem(SERVER_KEY) ?? "");
-    if (saved) return saved;
-  } catch {
-    /* storage unavailable */
-  }
-  return BUILT_API_BASE;
+  return savedServerUrl() || discoveredServerUrl() || BUILT_API_BASE;
 }
 
 export function setServerUrl(url: string): void {
@@ -79,7 +91,31 @@ export function setServerUrl(url: string): void {
   }
 }
 
+// Supabase's public "anon" key — meant to be embedded in client code, not a secret. `endpoints` only exposes the
+// backend's own current public URL, published there each time the tunnel restarts with a new hostname (see
+// deploy/windows/run-tunnel-loop.ps1), so a Vercel-hosted dashboard finds it without anyone re-pasting a link.
+const DISCOVERY_URL = "https://tdapqzuqjeruuyicihlq.supabase.co/rest/v1/endpoints?id=eq.backend&select=url";
+const DISCOVERY_ANON_KEY = "sb_publishable_0i9GEZKzyVUN9LNkp4xmMA_ACb48ABz";
+
+/** Looks up the backend's current URL from Supabase; caches it (for `apiBase`) and returns it, or "" if unavailable. */
+export async function discoverServerUrl(): Promise<string> {
+  try {
+    const response = await fetch(DISCOVERY_URL, { headers: { apikey: DISCOVERY_ANON_KEY } });
+    if (!response.ok) return "";
+    const rows = (await response.json()) as { url?: string }[];
+    const url = clean(rows[0]?.url ?? "");
+    if (url) localStorage.setItem(DISCOVERED_KEY, url);
+    return url;
+  } catch {
+    return "";
+  }
+}
+
 const askToConnect = () => window.dispatchEvent(new CustomEvent("cc:connect"));
+
+function attempt(base: string, path: string, rest: RequestInit, headers: Headers, body: BodyInit | null | undefined): Promise<Response> {
+  return fetch(`${base}${path}`, { ...rest, headers, body });
+}
 
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, ...rest } = init;
@@ -91,19 +127,30 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     headers.set("Content-Type", "application/json");
     body = JSON.stringify(json);
   }
-  const base = apiBase();
+  let base = apiBase();
   let response: Response;
   try {
-    response = await fetch(`${base}${path}`, { ...rest, headers, body });
-  } catch (error) {
-    // A separately hosted server that can't be reached (tunnel closed, link changed): ask for the link again.
-    if (base) askToConnect();
-    throw error;
-  }
-  if ((response.headers.get("content-type") ?? "").includes("text/html")) {
-    // An HTML page instead of the API: this dashboard is hosted apart (e.g. Vercel) and has no server link yet.
-    askToConnect();
-    throw new ApiError(0, "This address is not a DalalSight server. Enter the server link.");
+    response = await attempt(base, path, rest, headers, body);
+    if ((response.headers.get("content-type") ?? "").includes("text/html")) throw new Error("html");
+  } catch {
+    // The current base failed (link changed, tunnel restarted, or nothing saved yet). Unless the user pinned a
+    // link themselves, look up the current one from Supabase and retry once before asking them to connect.
+    if (savedServerUrl()) {
+      askToConnect();
+      throw new ApiError(0, "Can't reach that server. Check the server link.");
+    }
+    const discovered = await discoverServerUrl();
+    if (!discovered || discovered === base) {
+      askToConnect();
+      throw new ApiError(0, "This address is not a DalalSight server. Enter the server link.");
+    }
+    base = discovered;
+    try {
+      response = await attempt(base, path, rest, headers, body);
+    } catch (error) {
+      askToConnect();
+      throw error;
+    }
   }
   const text = await response.text();
   let data: unknown = null;
