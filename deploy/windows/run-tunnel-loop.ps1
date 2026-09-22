@@ -36,8 +36,10 @@ function Publish-Url($url) {
 while ($true) {
     "$(Get-Date -Format o)  starting tunnel" | Add-Content -Path $log
     $tunnelLog = Join-Path $root "data\tunnel-current.log"
-    Remove-Item $tunnelLog -ErrorAction SilentlyContinue
-    $proc = Start-Process -FilePath $cloudflared -ArgumentList "tunnel","--url","http://127.0.0.1:8765" -RedirectStandardError $tunnelLog -RedirectStandardOutput $tunnelLog -NoNewWindow -PassThru
+    $tunnelOutLog = Join-Path $root "data\tunnel-current.out.log"
+    Remove-Item $tunnelLog, $tunnelOutLog -ErrorAction SilentlyContinue
+    # cloudflared logs to stderr; Start-Process refuses to redirect stdout and stderr to the same file.
+    $proc = Start-Process -FilePath $cloudflared -ArgumentList "tunnel","--url","http://127.0.0.1:8765" -RedirectStandardError $tunnelLog -RedirectStandardOutput $tunnelOutLog -NoNewWindow -PassThru
 
     $published = $false
     for ($i = 0; $i -lt 30 -and -not $published; $i++) {
